@@ -91,7 +91,6 @@ def apply_mql_filters(RecordClass, query_session, filters=None,
         attr_name_stack = list()
         sub_query_name_stack = list()
         relation_type_stack = list()
-        expressions = list()
         query_tree_stack = list()
         query_tree_stack.append({
             "op": and_,
@@ -115,7 +114,7 @@ def apply_mql_filters(RecordClass, query_session, filters=None,
                             query_tree["op"] == or_):
                         expression = query_tree["op"](
                             *query_tree["expressions"])
-                    elif (query_tree["op"] == not_):
+                    elif query_tree["op"] == not_:
                         expression = not_(query_tree["expressions"][0])
                     else:
                         #should be a .has or .any.
