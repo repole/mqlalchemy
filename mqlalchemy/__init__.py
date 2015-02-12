@@ -22,9 +22,11 @@ import datetime
 
 __version__ = "0.1.0"
 
+
 class InvalidMQLException(Exception):
     """Generic exception class for invalid queries."""
     pass
+
 
 def apply_mql_filters(RecordClass, query_session, filters=None,
                       whitelist=None):
@@ -117,9 +119,9 @@ def apply_mql_filters(RecordClass, query_session, filters=None,
                     elif query_tree["op"] == not_:
                         expression = not_(query_tree["expressions"][0])
                     else:
-                        #should be a .has or .any.
-                        #expressions should be a one element list
-                        #TODO - check expressions len is 1, else raise
+                        # should be a .has or .any.
+                        # expressions should be a one element list
+                        # TODO - check expressions len is 1, else raise
                         expression = query_tree["op"](
                             query_tree["expressions"][0])
                     query_tree_stack[-1]["expressions"].append(expression)
@@ -169,8 +171,8 @@ def apply_mql_filters(RecordClass, query_session, filters=None,
                             "expressions": []
                         })
                         query_stack.append("POP_query_tree_stack")
-                        #TODO not sure how an $all to start a query
-                        #would function.
+                        # TODO - not sure how an $all to start a query
+                        # would function.
                         attr_name = attr_name_stack[-1]
                         for sub_item in item[key]:
                             if isinstance(item[key], dict):
@@ -183,19 +185,20 @@ def apply_mql_filters(RecordClass, query_session, filters=None,
                         attr_name = _get_full_attr_name(attr_name_stack)
                         parent_sub_query_names = _get_full_attr_name(
                             sub_query_name_stack)
-                        #trim the parent sub query attrs from
-                        #the beginning of the attr_name
-                        #note that parent_sub_query_names will always
-                        #at least contain RecordClass at the start.
+                        # trim the parent sub query attrs from
+                        # the beginning of the attr_name
+                        # note that parent_sub_query_names will always
+                        # at least contain RecordClass at the start.
                         sub_query_name = attr_name[len(
                             parent_sub_query_names) + 1:]
                         sub_query_name_stack.append(sub_query_name)
                         query_stack.append("POP_sub_query_name_stack")
                         query_stack.append("POP_query_tree_stack")
-                        #query_stack.append(")")
+                        # query_stack.append(")")
                         query_stack.append(item[key])
-                        prop_types = _get_property_types(RecordClass, attr_name)
-                        SubClass = prop_types[-1]
+                        class_attrs = _get_class_attributes(
+                            RecordClass, attr_name)
+                        SubClass = class_attrs[-1]
                         relation_type_stack.append(SubClass)
                         if (hasattr(SubClass, "property") and
                                 type(SubClass.property) ==
@@ -218,49 +221,49 @@ def apply_mql_filters(RecordClass, query_session, filters=None,
                                              attr_name_stack, key),
                                          whitelist):
                         if len(attr_name_stack) > len(sub_query_name_stack):
-                            #nested attribute queries aren't allowed.
-                            #this type of search implies an equality
-                            #check on an object.
+                            # nested attribute queries aren't allowed.
+                            # this type of search implies an equality
+                            # check on an object.
                             raise InvalidMQLException(
                                 "Nested attribute queries are not allowed.")
-                        #Next couple blocks of code help us find
-                        #the first new relationship property
-                        #in our attr hierarchy.
-                        #TODO - Do this in a more pythonic way.
-                        #find the properties that are relationship
+                        # Next couple blocks of code help us find
+                        # the first new relationship property
+                        # in our attr hierarchy.
+                        # TODO - Do this in a more pythonic way.
+                        # find the properties that are relationship
                         # properties in our attr hierarchy.
                         full_attr_name = _get_full_attr_name(
                             attr_name_stack, key)
-                        prop_types = _get_property_types(
+                        class_attrs = _get_class_attributes(
                             RecordClass, full_attr_name)
                         split_full_attr = full_attr_name.split('.')
                         relation_indexes = []
-                        for i, prop_type in enumerate(prop_types):
-                            if (hasattr(prop_type, "property") and
-                                    type(prop_type.property) ==
+                        for i, class_attr in enumerate(class_attrs):
+                            if (hasattr(class_attr, "property") and
+                                    type(class_attr.property) ==
                                     RelationshipProperty):
-                                if (i == len(prop_types) - 1 or not
+                                if (i == len(class_attrs) - 1 or not
                                         split_full_attr[i+1][0].isdigit()):
                                     relation_indexes.append(i)
-                        #find the properties that are relationships
-                        #that already have subqueries in our
-                        #attr hierarchy.
-                        #psq stands for parent_sub_query
+                        # find the properties that are relationships
+                        # that already have subqueries in our
+                        # attr hierarchy.
+                        # psq stands for parent_sub_query
                         psq_attr_name = _get_full_attr_name(
                             sub_query_name_stack)
-                        psq_prop_types = _get_property_types(
+                        psq_class_attrs = _get_class_attributes(
                             RecordClass, psq_attr_name)
                         psq_split_attr_name = psq_attr_name.split('.')
                         psq_relation_indexes = []
-                        for i, prop_type in enumerate(psq_prop_types):
-                            if (hasattr(prop_type, "property") and
-                                    type(prop_type.property) ==
+                        for i, class_attr in enumerate(psq_class_attrs):
+                            if (hasattr(class_attr, "property") and
+                                    type(class_attr.property) ==
                                     RelationshipProperty):
-                                if (i == len(psq_prop_types) - 1 or not
+                                if (i == len(psq_class_attrs) - 1 or not
                                         psq_split_attr_name[i+1][0].isdigit()):
                                     psq_relation_indexes.append(i)
                         if len(psq_relation_indexes) == len(relation_indexes):
-                            #There is no new relationship query
+                            # There is no new relationship query
                             attr_name_stack.append(key)
                             query_stack.append("POP_attr_name_stack")
                             if isinstance(item[key], dict):
@@ -268,18 +271,18 @@ def apply_mql_filters(RecordClass, query_session, filters=None,
                             else:
                                 query_stack.append({"$eq": item[key]})
                         elif len(relation_indexes) > len(psq_relation_indexes):
-                            #Parse out the next relation sub query
-                            #e.g.
-                            #full_attr_name =
-                            #RClass.prop1.Relation1.prop2.Relation2.p2
-                            #sub_query_name_stack =
-                            #[RClass, prop1.Relation1]
-                            #result:
-                            #prop2.Releation2
+                            # Parse out the next relation sub query
+                            # e.g.
+                            # full_attr_name =
+                            # RClass.prop1.Relation1.prop2.Relation2.p2
+                            # sub_query_name_stack =
+                            # [RClass, prop1.Relation1]
+                            # result:
+                            # prop2.Releation2
                             new_relation_index = relation_indexes[len(
                                 psq_relation_indexes)]
                             attr_name = ""
-                            #get the last relation index from the psq
+                            # get the last relation index from the psq
                             prior_relation_index = 0
                             if len(psq_relation_indexes) > 0:
                                 prior_relation_index = psq_relation_indexes[-1]
@@ -290,38 +293,38 @@ def apply_mql_filters(RecordClass, query_session, filters=None,
                                     attr_name += "."
                             attr_name_stack.append(attr_name)
                             query_stack.append("POP_attr_name_stack")
-                            #now parse out any remaining property names.
-                            #in the above example, this would be p2
+                            # now parse out any remaining property names.
+                            # in the above example, this would be p2
                             sub_attr_name = ""
                             for i in range(new_relation_index + 1,
                                            len(split_full_attr)):
                                 sub_attr_name += split_full_attr[i]
                                 if i != (len(split_full_attr) - 1):
                                     sub_attr_name += "."
-                            #below generated $elemMatches will end up
-                            #appending the attr_name (that was already
-                            #appended to the attr_name_stack) to the
-                            #sub_query_name_stack.
+                            # below generated $elemMatches will end up
+                            # appending the attr_name (that was already
+                            # appended to the attr_name_stack) to the
+                            # sub_query_name_stack.
                             if (new_relation_index == relation_indexes[-1] and
                                     isinstance(item[key], dict)):
                                 if sub_attr_name != "":
-                                    #querying a single attribute of this
-                                    #relation.
+                                    # querying a single attribute of this
+                                    # relation.
                                     query_stack.append({"$elemMatch": {
                                         sub_attr_name: item[key]}})
                                 else:
-                                    if not len(item[key].keys() > 0):
-                                        #dictionary has no keys, invalid query.
+                                    if not len(item[key].keys()) > 0:
+                                        # dictionary has no keys, invalid query.
                                         raise InvalidMQLException(
                                             "Attribute " + full_attr_name +
                                             " can't be compared to an empty " +
                                             " dictionary.")
                                     else:
-                                        #TODO may also want to check
-                                        #for invalid sub_keys. A bad
-                                        #key at this point would throw
-                                        #an exception we aren't
-                                        #catching.
+                                        # TODO may also want to check
+                                        # for invalid sub_keys. A bad
+                                        # key at this point would throw
+                                        # an exception we aren't
+                                        # catching.
                                         query_tree_stack.append({
                                             "op": and_,
                                             "expressions": []
@@ -341,29 +344,29 @@ def apply_mql_filters(RecordClass, query_session, filters=None,
                                 if (new_relation_index ==
                                         relation_indexes[-1] and
                                         sub_attr_name == ""):
-                                    #item[key] is not a dict and there
-                                    #is no sub_attr, so we're trying to
-                                    #equality check a relation.
+                                    # item[key] is not a dict and there
+                                    # is no sub_attr, so we're trying to
+                                    # equality check a relation.
                                     raise InvalidMQLException(
                                         "Relation " + full_attr_name +
                                         " can't be checked for equality.")
                                 else:
-                                    #must have a sub_attr, so turn into
-                                    #an elemMatch for that sub_attr.
+                                    # must have a sub_attr, so turn into
+                                    # an elemMatch for that sub_attr.
                                     query_stack.append({"$elemMatch": {
                                         sub_attr_name: item[key]}})
                     elif key in set(["$eq", "$neq", "$lt", "$lte", "$gte",
                                      "$gt", "$mod", "$like"]):
-                        prop_types = _get_property_types(
+                        class_attrs = _get_class_attributes(
                             RecordClass,
                             _get_full_attr_name(attr_name_stack))
-                        if (prop_types and
-                                hasattr(prop_types[-1], "property") and
-                                type(prop_types[-1].property) ==
+                        if (class_attrs and
+                                hasattr(class_attrs[-1], "property") and
+                                type(class_attrs[-1].property) ==
                                 ColumnProperty):
                             target_type = (
-                                prop_types[-1].property.columns[0].type)
-                            attr = prop_types[-1]
+                                class_attrs[-1].property.columns[0].type)
+                            attr = class_attrs[-1]
                         else:
                             raise InvalidMQLException(
                                 "Relation " + full_attr_name +
@@ -436,13 +439,14 @@ def _get_full_attr_name(attr_name_stack, short_attr_name=None):
         attr_name += short_attr_name
     return attr_name
 
+
 def _is_whitelisted(RecordClass, attr_name, whitelist):
     """Check if this attr_name is approved to be filtered or sorted."""
     try:
-        _get_property_types(RecordClass, attr_name)
+        _get_class_attributes(RecordClass, attr_name)
     except InvalidMQLException:
-        #RecordClass doesn't contain this attr_name,
-        #therefor it can't be queried.
+        # RecordClass doesn't contain this attr_name,
+        # therefor it can't be queried.
         return False
     if whitelist is None:
         return True
@@ -450,42 +454,46 @@ def _is_whitelisted(RecordClass, attr_name, whitelist):
     if attr_name.startswith(RecordClass.__name__):
         attr_name = attr_name[(len(RecordClass.__name__) + 1):]
         split_attr = attr_name.split(".")
-        #parse out any list indexes. List1.0.other becomes Lis1.other
+        # parse out any list indexes. List1.0.other becomes Lis1.other
         attr_name = [attr for attr in split_attr if not attr[0].isdigit()]
-        attr_name = attr_name.join(".")
+        attr_name = ".".join([str(name) for name in attr_name])
         if attr_name in whitelist:
             return True
     return False
 
-def _get_property_types(RecordClass, attr_name):
-    """Get info about each attr given a dot notation attr_name."""
-    split_attr = attr_name.split(".")
-    #We assume the full attr name includes the RecordClass
-    #Thus we pop the first name.
-    #e.g. RecordClass.prop.subprop becomes prop.subprop
-    split_attr.pop(0)
-    prop_types = []
+
+def _get_class_attributes(RecordClass, attr_name):
+    """Get info about each attr given a dot notation attr name."""
+    split_attr_name = attr_name.split(".")
+    # We assume the full attr name includes the RecordClass
+    # Thus we pop the first name.
+    # e.g. RecordClass.prop.subprop becomes prop.subprop
+    split_attr_name.pop(0)
+    class_attrs = []
     root_type = RecordClass
-    prop_types.append(root_type)
-    if len(split_attr) > 0:
-        for attr_name in split_attr:
+    class_attrs.append(root_type)
+    if len(split_attr_name) > 0:
+        for attr_name in split_attr_name:
             if (hasattr(root_type, "property") and
                     type(root_type.property) == RelationshipProperty):
-                if len(attr_name) > 0 and attr_name[0].isdigit():
-                    prop_types.append(inspect(root_type).mapper.class_)
+                if len(attr_name) > 0 and (
+                        attr_name[0].startswith("$id") or
+                        attr_name[0].startswith("$new")):
+                    class_attrs.append(inspect(root_type).mapper.class_)
                     continue
                 else:
                     root_type = inspect(root_type).mapper.class_
             for prop_name in dir(root_type):
                 if prop_name == attr_name:
-                    prop_type = getattr(root_type, prop_name)
-                    root_type = prop_type
-                    prop_types.append(prop_type)
+                    class_attr = getattr(root_type, prop_name)
+                    root_type = class_attr
+                    class_attrs.append(class_attr)
                     break
-    if (len(split_attr) + 1) != len(prop_types):
-        raise InvalidMQLException(
+    if (len(split_attr_name) + 1) != len(class_attrs):
+        raise AttributeError(
             "The attribute provided does not exist in this class.")
-    return prop_types
+    return class_attrs
+
 
 def _convert_to_alchemy_type(value, alchemy_type):
     """Convert a given value to a sqlalchemy friendly type."""
@@ -509,9 +517,9 @@ def _convert_to_alchemy_type(value, alchemy_type):
         if not isinstance(value, bool):
             if (str(value).lower() == "false" or
                     value == "0" or
-                    value == False or
                     value == 0 or
-                    value == None):
+                    value is False or
+                    value is None):
                 result = False
             else:
                 result = True
@@ -541,5 +549,3 @@ def _convert_to_alchemy_type(value, alchemy_type):
         return result
     except NameError:
         raise InvalidMQLException("Unable to convert value to alchemy type.")
-
-
