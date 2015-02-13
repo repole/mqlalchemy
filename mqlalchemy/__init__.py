@@ -182,9 +182,8 @@ def apply_mql_filters(RecordClass, query_session, filters=None,
                                     {attr_name: {"$eq": sub_item}})
 
                     elif key == "$elemMatch":
-                        attr_name = _get_full_attr_name(attr_name_stack)
-                        parent_sub_query_names = _get_full_attr_name(
-                            sub_query_name_stack)
+                        attr_name = ".".join(attr_name_stack)
+                        parent_sub_query_names = ".".join(sub_query_name_stack)
                         # trim the parent sub query attrs from
                         # the beginning of the attr_name
                         # note that parent_sub_query_names will always
@@ -249,8 +248,7 @@ def apply_mql_filters(RecordClass, query_session, filters=None,
                         # that already have subqueries in our
                         # attr hierarchy.
                         # psq stands for parent_sub_query
-                        psq_attr_name = _get_full_attr_name(
-                            sub_query_name_stack)
+                        psq_attr_name = ".".join(sub_query_name_stack)
                         psq_class_attrs = _get_class_attributes(
                             RecordClass, psq_attr_name)
                         psq_split_attr_name = psq_attr_name.split('.')
@@ -359,7 +357,7 @@ def apply_mql_filters(RecordClass, query_session, filters=None,
                                      "$gt", "$mod", "$like"]):
                         class_attrs = _get_class_attributes(
                             RecordClass,
-                            _get_full_attr_name(attr_name_stack))
+                            ".".join(attr_name_stack))
                         if (class_attrs and
                                 hasattr(class_attrs[-1], "property") and
                                 type(class_attrs[-1].property) ==
@@ -425,16 +423,9 @@ def apply_mql_filters(RecordClass, query_session, filters=None,
 
 def _get_full_attr_name(attr_name_stack, short_attr_name=None):
     """Join the attr_name_stack to get a full attribute name."""
-    attr_name = ""
-    is_first = True
-    for parent_attr in attr_name_stack:
-        if not is_first:
-            attr_name += "."
-        else:
-            is_first = False
-        attr_name += parent_attr
-    if short_attr_name is not None:
-        if not is_first:
+    attr_name = ".".join(attr_name_stack)
+    if short_attr_name != "":
+        if attr_name != "":
             attr_name += "."
         attr_name += short_attr_name
     return attr_name
