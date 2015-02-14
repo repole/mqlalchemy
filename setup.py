@@ -3,10 +3,6 @@ import ast
 import os
 from setuptools import setup
 
-
-def read(file_name):
-    return open(os.path.join(os.path.dirname(__file__), file_name)).read()
-
 _version_re = re.compile(r'__version__\s+=\s+(.*)')
 with open('mqlalchemy/__init__.py', 'rb') as f:
     version = str(ast.literal_eval(_version_re.search(
@@ -21,7 +17,6 @@ setup(
     author='Nicholas Repole',
     author_email='n.repole@gmail.com',
     description='Query SQLAlchemy models with MongoDB syntax.',
-    long_description=read('README.md'),
     packages=['mqlalchemy'],
     zip_safe=False,
     platforms='any',
