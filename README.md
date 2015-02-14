@@ -20,15 +20,21 @@ You definitely shouldn't yet. I've barely tested this at all, lots of things are
 
 **Examples?**
 ```python
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
 from mqlalchemy import apply_mql_filters
 from myapp.mymodels import User
 
-#get your sqlalchemy db session here
+# get your sqlalchemy db session here
+db_engine = create_engine("sqlite+pysqlite:///mydb.sqlite")
+DBSession = sessionmaker(bind=db_engine)
+db_session = DBSession()
 
+# define which fields of User are ok to query
 whitelist = ["user_id", "username", "friends.user_id"]
-#get back a user where their id is 1 and they have a friend with id 2
+# get back a user who's id is 1 and who has a friend with id 2
 filters = {"user_id": 1, "friends.user_id": 2}
-query = apply_mql_filters(User, db_session, filters, whitelist)
+query = apply_mql_filters(db_session, User, filters, whitelist)
 matching_records = query.all()
 ```
 
@@ -38,9 +44,8 @@ I'm sure my actual syntax parsing is inefficient and has loads of room for impro
 
 
 **TODO**
-* Tests
-* Documentation
-* setup.py
+* More tests
+* Better documentation
 * Split my one massive function into a more maintainable set of functions
 
 Certainly open to input and contributions if you'd like to help.

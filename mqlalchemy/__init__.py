@@ -28,7 +28,7 @@ class InvalidMQLException(Exception):
     pass
 
 
-def apply_mql_filters(RecordClass, query_session, filters=None,
+def apply_mql_filters(query_session, RecordClass, filters=None,
                       whitelist=None):
     """Applies filters to a query and returns it.
 
@@ -70,9 +70,9 @@ def apply_mql_filters(RecordClass, query_session, filters=None,
     things even harder to follow. Should find a better way of
     breaking things up, but for now, accept my apologies.
 
-    :param RecordClass: The sqlalchemy model class you want to query.
     :param query_session: A db session or query object. Filters are
                           applied to this object.
+    :param RecordClass: The sqlalchemy model class you want to query.
     :param filters: A dictionary of mongodb style query filters.
     :param whitelist: A list of the attributes that are approved for
                       filtering. If you are querying the User model,
@@ -180,7 +180,6 @@ def apply_mql_filters(RecordClass, query_session, filters=None,
                             else:
                                 query_stack.append(
                                     {attr_name: {"$eq": sub_item}})
-
                     elif key == "$elemMatch":
                         attr_name = ".".join(attr_name_stack)
                         parent_sub_query_names = ".".join(sub_query_name_stack)
@@ -215,6 +214,69 @@ def apply_mql_filters(RecordClass, query_session, filters=None,
                         else:
                             raise InvalidMQLException(
                                 "$elemMatch not applied to subobject.")
+                    elif key in set(["$eq", "$neq", "$lt", "$lte", "$gte",
+                                     "$gt", "$mod", "$like"]):
+                        class_attrs = _get_class_attributes(
+                            RecordClass,
+                            ".".join(attr_name_stack))
+                        if (class_attrs and
+                                hasattr(class_attrs[-1], "property") and
+                                type(class_attrs[-1].property) ==
+                                ColumnProperty):
+                            target_type = (
+                                class_attrs[-1].property.columns[0].type)
+                            attr = class_attrs[-1]
+                        else:
+                            raise InvalidMQLException(
+                                "Relation " + full_attr_name +
+                                " can't be checked for equality.")
+                        if key == "$lt":
+                            expression = attr < _convert_to_alchemy_type(
+                                item[key], target_type)
+                        elif key == "$lte":
+                            expression = attr <= _convert_to_alchemy_type(
+                                item[key], target_type)
+                        elif key == "$eq":
+                            expression = attr == _convert_to_alchemy_type(
+                                item[key], target_type)
+                        elif key == "$neq":
+                            expression = attr != _convert_to_alchemy_type(
+                                item[key], target_type)
+                        elif key == "$gte":
+                            expression = attr >= _convert_to_alchemy_type(
+                                item[key], target_type)
+                        elif key == "$gt":
+                            expression = attr > _convert_to_alchemy_type(
+                                item[key], target_type)
+                        elif key == "$like":
+                            expression = attr.like(_convert_to_alchemy_type(
+                                item[key], target_type))
+                        elif key == "$in" or key == "$nin":
+                            if not isinstance(item[key], list):
+                                raise InvalidMQLException(
+                                    key + " must contain a list.")
+                            converted_list = []
+                            for value in item[key]:
+                                converted_list.append(
+                                    _convert_to_alchemy_type(
+                                        value, target_type))
+                            expression = attr.in_(converted_list)
+                            if key == "$nin":
+                                expression = not_(expression)
+                        elif key == "$mod":
+                            if (isinstance(item[key], list) and
+                                    len(item[key]) == 2):
+                                try:
+                                    divider = int(item[key][0])
+                                    result = int(item[key][1])
+                                except ValueError:
+                                    raise InvalidMQLException(
+                                        "Invalid $mod values supplied.")
+                                expression = attr.op("%")(divider) == result
+                            else:
+                                raise InvalidMQLException(
+                                    "Invalid $mod values supplied.")
+                        query_tree_stack[-1]["expressions"].append(expression)
                     elif _is_whitelisted(RecordClass,
                                          _get_full_attr_name(
                                              attr_name_stack, key),
@@ -353,72 +415,9 @@ def apply_mql_filters(RecordClass, query_session, filters=None,
                                     # an elemMatch for that sub_attr.
                                     query_stack.append({"$elemMatch": {
                                         sub_attr_name: item[key]}})
-                    elif key in set(["$eq", "$neq", "$lt", "$lte", "$gte",
-                                     "$gt", "$mod", "$like"]):
-                        class_attrs = _get_class_attributes(
-                            RecordClass,
-                            ".".join(attr_name_stack))
-                        if (class_attrs and
-                                hasattr(class_attrs[-1], "property") and
-                                type(class_attrs[-1].property) ==
-                                ColumnProperty):
-                            target_type = (
-                                class_attrs[-1].property.columns[0].type)
-                            attr = class_attrs[-1]
-                        else:
-                            raise InvalidMQLException(
-                                "Relation " + full_attr_name +
-                                " can't be checked for equality.")
-                        if key == "$lt":
-                            expression = attr < _convert_to_alchemy_type(
-                                item[key], target_type)
-                        elif key == "$lte":
-                            expression = attr <= _convert_to_alchemy_type(
-                                item[key], target_type)
-                        elif key == "$eq":
-                            expression = attr == _convert_to_alchemy_type(
-                                item[key], target_type)
-                        elif key == "$neq":
-                            expression = attr != _convert_to_alchemy_type(
-                                item[key], target_type)
-                        elif key == "$gte":
-                            expression = attr >= _convert_to_alchemy_type(
-                                item[key], target_type)
-                        elif key == "$gt":
-                            expression = attr > _convert_to_alchemy_type(
-                                item[key], target_type)
-                        elif key == "$like":
-                            expression = attr.like(_convert_to_alchemy_type(
-                                item[key], target_type))
-                        elif key == "$in" or key == "$nin":
-                            if not isinstance(item[key], list):
-                                raise InvalidMQLException(
-                                    key + " must contain a list.")
-                            converted_list = []
-                            for value in item[key]:
-                                converted_list.append(
-                                    _convert_to_alchemy_type(
-                                        value, target_type))
-                            expression = attr.in_(converted_list)
-                            if key == "$nin":
-                                expression = not_(expression)
-                        elif key == "$mod":
-                            if (isinstance(item[key], list) and
-                                    len(item[key]) == 2):
-                                try:
-                                    divider = int(item[key][0])
-                                    result = int(item[key][1])
-                                except ValueError:
-                                    raise InvalidMQLException(
-                                        "Invalid $mod values supplied.")
-                                expression = attr.op("%")(divider) == result
-                            else:
-                                raise InvalidMQLException(
-                                    "Invalid $mod values supplied.")
-                        query_tree_stack[-1]["expressions"].append(expression)
         if query_tree_stack[-1]["expressions"]:
             query = query.filter(and_(*query_tree_stack[-1]["expressions"]))
-        return query
+    return query
 
 
 def _get_full_attr_name(attr_name_stack, short_attr_name=None):
@@ -454,7 +453,13 @@ def _is_whitelisted(RecordClass, attr_name, whitelist):
 
 
 def _get_class_attributes(RecordClass, attr_name):
-    """Get info about each attr given a dot notation attr name."""
+    """Get info about each attr given a dot notation attr name.
+
+    :raises: AttributeError if an invalid attribute name is given.
+    :returns: A list of attributes corresponding to the given
+              attr_name for the provided RecordClass.
+
+    """
     split_attr_name = attr_name.split(".")
     # We assume the full attr name includes the RecordClass
     # Thus we pop the first name.
@@ -474,12 +479,10 @@ def _get_class_attributes(RecordClass, attr_name):
                     continue
                 else:
                     root_type = inspect(root_type).mapper.class_
-            for prop_name in dir(root_type):
-                if prop_name == attr_name:
-                    class_attr = getattr(root_type, prop_name)
-                    root_type = class_attr
-                    class_attrs.append(class_attr)
-                    break
+            # will raise an AttributeError if attr_name not in root_type
+            class_attr = getattr(root_type, attr_name)
+            root_type = class_attr
+            class_attrs.append(class_attr)
     if (len(split_attr_name) + 1) != len(class_attrs):
         raise AttributeError(
             "The attribute provided does not exist in this class.")
