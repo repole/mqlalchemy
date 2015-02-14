@@ -16,6 +16,7 @@ setup(
     name='MQLAlchemy',
     version=version,
     url='https://github.com/repole/mqlalchemy',
+    download_url="https://github.com/repole/mqlalchemy/tarball/" + version,
     license='BSD',
     author='Nicholas Repole',
     author_email='n.repole@gmail.com',
@@ -27,6 +28,7 @@ setup(
     install_requires=[
         'SQLAlchemy>=0.9'
     ],
+    keywords=['mongodb', 'sqlalchemy', 'json', 'sql'],
     classifiers=[
         "Development Status :: 2 - Pre-Alpha",
         "Intended Audience :: Developers",
