@@ -25,7 +25,7 @@ setup(
     ],
     keywords=['mongodb', 'sqlalchemy', 'json', 'sql'],
     classifiers=[
-        "Development Status :: 2 - Pre-Alpha",
+        "Development Status :: 3 - Alpha",
         "Intended Audience :: Developers",
         "License :: OSI Approved :: BSD License",
         "Programming Language :: Python",

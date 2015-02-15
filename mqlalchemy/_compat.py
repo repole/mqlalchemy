@@ -6,7 +6,7 @@
     Python2/Python3 support helper library.
 
     :copyright: (c) 2015 by Nicholas Repole.
-    :license: BSD - See LICENSE.md for more details.
+    :license: BSD - See LICENSE for more details.
 """
 
 import sys

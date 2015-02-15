@@ -6,17 +6,16 @@
     Query SQLAlchemy objects using MongoDB style syntax.
 
     :copyright: (c) 2015 by Nicholas Repole.
-    :license: BSD - See LICENSE.md for more details.
+    :license: BSD - See LICENSE for more details.
 """
 from mqlalchemy._compat import str
 from sqlalchemy import and_, or_, not_
-from sqlalchemy.orm import class_mapper, ColumnProperty, RelationshipProperty
-from sqlalchemy.sql.elements import BinaryExpression
+from sqlalchemy.orm import ColumnProperty, RelationshipProperty
 from sqlalchemy.types import String, Text, Unicode, UnicodeText, Enum, \
     Integer, BigInteger, SmallInteger, Boolean, Date, DateTime, Float, \
-    Numeric, Time, BIGINT, BINARY, BLOB, BOOLEAN, CHAR, CLOB, DATE, \
-    DATETIME, DECIMAL, FLOAT, INT, INTEGER, NCHAR, NVARCHAR, NUMERIC, \
-    REAL, SMALLINT, TEXT, TIME, TIMESTAMP, VARBINARY, VARCHAR
+    Numeric, Time, BIGINT, BOOLEAN, CHAR, CLOB, DATE, DATETIME, \
+    DECIMAL, FLOAT, INT, INTEGER, NCHAR, NVARCHAR, NUMERIC, REAL, \
+    SMALLINT, TEXT, TIME, TIMESTAMP, VARCHAR
 from sqlalchemy.inspection import inspect
 import datetime
 
@@ -24,7 +23,9 @@ __version__ = "0.1.0"
 
 
 class InvalidMQLException(Exception):
+
     """Generic exception class for invalid queries."""
+
     pass
 
 
@@ -41,12 +42,10 @@ def apply_mql_filters(query_session, RecordClass, filters=None,
     $nin
     $gt
     $gte
-    $in
     $lt
     $lte
     $ne
     $mod
-    $all
 
     Custom operators added for convenience:
     $eq - Explicit equality check.
@@ -57,9 +56,11 @@ def apply_mql_filters(query_session, RecordClass, filters=None,
     $size
     Array index queries - User.sessions.0 would query the first session
                           for that user. Thus far haven't been able to
-                          find a way to support this with sqlalchemy.
+                          find a way to support this easily with
+                          SQLAlchemy.
 
     Won't be implemented:
+    $all
     $exists
     $text
     $type
@@ -121,7 +122,10 @@ def apply_mql_filters(query_session, RecordClass, filters=None,
                     else:
                         # should be a .has or .any.
                         # expressions should be a one element list
-                        # TODO - check expressions len is 1, else raise
+                        if len(query_tree["expressions"]) != 1:
+                            raise InvalidMQLException(
+                                "Unexpected error. Too many binary " +
+                                "expressions for this operator.")
                         expression = query_tree["op"](
                             query_tree["expressions"][0])
                     query_tree_stack[-1]["expressions"].append(expression)
@@ -162,24 +166,6 @@ def apply_mql_filters(query_session, RecordClass, filters=None,
                         })
                         query_stack.append("POP_query_tree_stack")
                         query_stack.append({"$or": item[key]})
-                    elif key == "$all":
-                        if not isinstance(item[key], list):
-                            raise InvalidMQLException(
-                                "$all must contain a list.")
-                        query_tree_stack.append({
-                            "op": and_,
-                            "expressions": []
-                        })
-                        query_stack.append("POP_query_tree_stack")
-                        # TODO - not sure how an $all to start a query
-                        # would function.
-                        attr_name = attr_name_stack[-1]
-                        for sub_item in item[key]:
-                            if isinstance(item[key], dict):
-                                query_stack.append({attr_name: sub_item})
-                            else:
-                                query_stack.append(
-                                    {attr_name: {"$eq": sub_item}})
                     elif key == "$elemMatch":
                         attr_name = ".".join(attr_name_stack)
                         parent_sub_query_names = ".".join(sub_query_name_stack)
@@ -214,8 +200,8 @@ def apply_mql_filters(query_session, RecordClass, filters=None,
                         else:
                             raise InvalidMQLException(
                                 "$elemMatch not applied to subobject.")
-                    elif key in set(["$eq", "$neq", "$lt", "$lte", "$gte",
-                                     "$gt", "$mod", "$like"]):
+                    elif key in set(["$eq", "$ne", "$lt", "$lte", "$gte",
+                                     "$gt", "$mod", "$like", "$in", "$nin"]):
                         class_attrs = _get_class_attributes(
                             RecordClass,
                             ".".join(attr_name_stack))
@@ -228,8 +214,7 @@ def apply_mql_filters(query_session, RecordClass, filters=None,
                             attr = class_attrs[-1]
                         else:
                             raise InvalidMQLException(
-                                "Relation " + full_attr_name +
-                                " can't be checked for equality.")
+                                "Relation can't be checked for equality.")
                         if key == "$lt":
                             expression = attr < _convert_to_alchemy_type(
                                 item[key], target_type)
@@ -239,7 +224,7 @@ def apply_mql_filters(query_session, RecordClass, filters=None,
                         elif key == "$eq":
                             expression = attr == _convert_to_alchemy_type(
                                 item[key], target_type)
-                        elif key == "$neq":
+                        elif key == "$ne":
                             expression = attr != _convert_to_alchemy_type(
                                 item[key], target_type)
                         elif key == "$gte":
@@ -249,8 +234,7 @@ def apply_mql_filters(query_session, RecordClass, filters=None,
                             expression = attr > _convert_to_alchemy_type(
                                 item[key], target_type)
                         elif key == "$like":
-                            expression = attr.like(_convert_to_alchemy_type(
-                                item[key], target_type))
+                            expression = attr.like("%" + str(item[key]) + "%")
                         elif key == "$in" or key == "$nin":
                             if not isinstance(item[key], list):
                                 raise InvalidMQLException(
@@ -380,11 +364,11 @@ def apply_mql_filters(query_session, RecordClass, filters=None,
                                             " can't be compared to an empty " +
                                             " dictionary.")
                                     else:
-                                        # TODO may also want to check
+                                        # TODO - may also want to check
                                         # for invalid sub_keys. A bad
                                         # key at this point would throw
                                         # an exception we aren't
-                                        # catching.
+                                        # gracefully catching.
                                         query_tree_stack.append({
                                             "op": and_,
                                             "expressions": []
@@ -415,6 +399,16 @@ def apply_mql_filters(query_session, RecordClass, filters=None,
                                     # an elemMatch for that sub_attr.
                                     query_stack.append({"$elemMatch": {
                                         sub_attr_name: item[key]}})
+                    else:
+                        if key.startswith("$"):
+                            raise InvalidMQLException(
+                                "Invalid operator: " + key
+                            )
+                        else:
+                            raise InvalidMQLException(
+                                _get_full_attr_name(attr_name_stack, key) +
+                                " is not a whitelisted attribute."
+                            )
         if query_tree_stack[-1]["expressions"]:
             query = query.filter(and_(*query_tree_stack[-1]["expressions"]))
     return query
