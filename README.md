@@ -15,7 +15,7 @@ It can be. When using this with any sort of user input, you'll want to pass in a
 
 **So, can I actually use this for a serious project?**
 
-You definitely shouldn't yet. I've barely tested this at all, lots of things are probably broken.
+You probably shouldn't yet in a serious project. There's some basic testing, but this certainly isn't a very mature project yet.
 
 
 **Examples?**
@@ -45,6 +45,7 @@ I'm sure my actual syntax parsing is inefficient and has loads of room for impro
 
 **TODO**
 * More tests
+* More graceful and informative exception messages
 * Better documentation
 * Split my one massive function into a more maintainable set of functions
 
