@@ -17,6 +17,25 @@ It can be. When using this with any sort of user input, you'll want to pass in a
 
 You probably shouldn't yet in a serious project. There's some basic testing, but this certainly isn't a very mature project yet.
 
+**Supported Operators**
+
+* $and
+* $or
+* $not
+* $nor
+* $in
+* $nin
+* $gt
+* $gte
+* $lt
+* $lte
+* $ne
+* $mod
+
+Custom operators added for convenience:
+* $eq - Explicit equality check.
+* $like - Search a text field for the given value.
+
 
 **Examples?**
 ```python
