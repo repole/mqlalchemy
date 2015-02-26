@@ -467,8 +467,8 @@ def _get_class_attributes(RecordClass, attr_name):
             if (hasattr(root_type, "property") and
                     type(root_type.property) == RelationshipProperty):
                 if len(attr_name) > 0 and (
-                        attr_name[0].startswith("$id") or
-                        attr_name[0].startswith("$new")):
+                        attr_name.startswith("$id") or
+                        attr_name.startswith("$new")):
                     class_attrs.append(inspect(root_type).mapper.class_)
                     continue
                 else:
