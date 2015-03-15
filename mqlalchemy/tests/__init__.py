@@ -103,6 +103,22 @@ class MQLAlchemyTests(unittest.TestCase):
             len(result) == 1 and
             result[0].album_id == 48)
 
+    def test_more_complex_list_relation(self):
+        """Test that a complex list relation query works."""
+        query = apply_mql_filters(
+            self.db_session,
+            models.Album,
+            {"tracks": {
+                "$elemMatch": {
+                    "playlists.playlist_id": 18
+                }
+            }}
+        )
+        result = query.all()
+        self.assertTrue(
+            len(result) == 1 and
+            result[0].album_id == 48)
+
     def test_explicit_elemmatch(self):
         """Test that an explicit elemMatch."""
         query = apply_mql_filters(
@@ -573,5 +589,5 @@ class MQLAlchemyTests(unittest.TestCase):
             1
         )
 
-if __name__ == '__main__':
+if __name__ == '__main__':    # pragma no cover
     unittest.main()

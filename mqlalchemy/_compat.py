@@ -10,9 +10,9 @@
 """
 
 import sys
-if sys.version_info[0] == 2:
+if sys.version_info[0] == 2:    # pragma no cover
     bytes = str
     str = unicode
-else:
+else:    # pragma no cover
     str = str
     bytes = bytes

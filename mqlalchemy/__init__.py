@@ -130,7 +130,8 @@ def apply_mql_filters(query_session, RecordClass, filters=None,
                     else:
                         # should be a .has or .any.
                         # expressions should be a one element list
-                        if len(query_tree["expressions"]) != 1:
+                        if len(query_tree[
+                                "expressions"]) != 1:    # pragma no cover
                             # failsafe - Should never reach here.
                             raise InvalidMQLException(
                                 "Unexpected error. Too many binary " +
@@ -353,7 +354,11 @@ def apply_mql_filters(query_session, RecordClass, filters=None,
                             for i in range(prior_relation_index + 1,
                                            new_relation_index + 1):
                                 attr_name += split_full_attr[i]
-                                if i != new_relation_index:
+                                next_relation = new_relation_index
+                                if i != next_relation:    # pragma no cover
+                                    # failsafe - won't hit this until
+                                    # list index based queries are
+                                    # implemented.
                                     attr_name += "."
                             attr_name_stack.append(attr_name)
                             query_stack.append("POP_attr_name_stack")
@@ -421,7 +426,7 @@ def apply_mql_filters(query_session, RecordClass, filters=None,
                                         sub_attr_name: item[key]}})
                     else:
                         raise InvalidMQLException(
-                            _get_full_attr_name(attr_name_stack, key) +
+                            _get_full_attr_name(attr_name_stack) +
                             " is not a whitelisted attribute."
                         )
         if query_tree_stack[-1]["expressions"]:

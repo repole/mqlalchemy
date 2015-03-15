@@ -1,4 +1,6 @@
 # mqlalchemy
+[![Build Status](https://travis-ci.org/repole/mqlalchemy.svg?branch=master)](https://travis-ci.org/repole/mqlalchemy)
+[![Coverage Status](https://coveralls.io/repos/repole/mqlalchemy/badge.svg?branch=master)](https://coveralls.io/r/repole/mqlalchemy?branch=master)
 
 Query SQLAlchemy models using MongoDB style syntax.
 
