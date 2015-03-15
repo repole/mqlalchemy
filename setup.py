@@ -20,6 +20,10 @@ setup(
     packages=['mqlalchemy'],
     zip_safe=False,
     platforms='any',
+    test_suite='mqlalchemy.tests',
+    tests_require=[
+        'SQLAlchemy>=0.9'
+    ],
     install_requires=[
         'SQLAlchemy>=0.9'
     ],

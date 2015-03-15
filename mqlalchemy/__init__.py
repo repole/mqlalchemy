@@ -19,7 +19,7 @@ from sqlalchemy.types import String, Text, Unicode, UnicodeText, Enum, \
 from sqlalchemy.inspection import inspect
 import datetime
 
-__version__ = "0.1.0"
+__version__ = "0.1.1"
 
 
 class InvalidMQLException(Exception):
@@ -30,7 +30,7 @@ class InvalidMQLException(Exception):
 
 
 def apply_mql_filters(query_session, RecordClass, filters=None,
-                      whitelist=None):
+                      whitelist=None, stack_size_limit=None):
     """Applies filters to a query and returns it.
 
     Supported operators include:
@@ -83,6 +83,10 @@ def apply_mql_filters(query_session, RecordClass, filters=None,
                       passwords or that type of thing.
                       If left as `None`, all attributes will be
                       queryable.
+    :param stack_size_limit: Optoinal paramater used to limit the
+                             allowable complexity of the provided
+                             filters. Can be useful in proventing
+                             malicious query attempts.
 
     """
     if hasattr(query_session, "query"):
@@ -104,6 +108,9 @@ def apply_mql_filters(query_session, RecordClass, filters=None,
         attr_name_stack.append(RecordClass.__name__)
         sub_query_name_stack.append(RecordClass.__name__)
         while query_stack:
+            if stack_size_limit and len(query_stack) > stack_size_limit:
+                raise InvalidMQLException(
+                    "This query is too complex.")
             item = query_stack.pop()
             if isinstance(item, str):
                 if item == "POP_attr_name_stack":
@@ -123,6 +130,7 @@ def apply_mql_filters(query_session, RecordClass, filters=None,
                         # should be a .has or .any.
                         # expressions should be a one element list
                         if len(query_tree["expressions"]) != 1:
+                            # failsafe - Should never reach here.
                             raise InvalidMQLException(
                                 "Unexpected error. Too many binary " +
                                 "expressions for this operator.")
@@ -199,9 +207,9 @@ def apply_mql_filters(query_session, RecordClass, filters=None,
                                 })
                         else:
                             raise InvalidMQLException(
-                                "$elemMatch not applied to subobject.")
-                    elif key in set(["$eq", "$ne", "$lt", "$lte", "$gte",
-                                     "$gt", "$mod", "$like", "$in", "$nin"]):
+                                "$elemMatch not applied to subobject: " +
+                                attr_name)
+                    elif key.startswith("$"):
                         class_attrs = _get_class_attributes(
                             RecordClass,
                             ".".join(attr_name_stack))
@@ -209,40 +217,44 @@ def apply_mql_filters(query_session, RecordClass, filters=None,
                                 hasattr(class_attrs[-1], "property") and
                                 type(class_attrs[-1].property) ==
                                 ColumnProperty):
-                            target_type = (
+                            target_type = type(
                                 class_attrs[-1].property.columns[0].type)
                             attr = class_attrs[-1]
                         else:
+                            # failsafe - should never hit this
+                            # due to earlier checks
                             raise InvalidMQLException(
-                                "Relation can't be checked for equality.")
+                                "Relation can't be checked for equality: " +
+                                _get_full_attr_name(attr_name_stack, key))
                         if key == "$lt":
-                            expression = attr < _convert_to_alchemy_type(
+                            expression = attr < convert_to_alchemy_type(
                                 item[key], target_type)
                         elif key == "$lte":
-                            expression = attr <= _convert_to_alchemy_type(
+                            expression = attr <= convert_to_alchemy_type(
                                 item[key], target_type)
                         elif key == "$eq":
-                            expression = attr == _convert_to_alchemy_type(
+                            expression = attr == convert_to_alchemy_type(
                                 item[key], target_type)
                         elif key == "$ne":
-                            expression = attr != _convert_to_alchemy_type(
+                            expression = attr != convert_to_alchemy_type(
                                 item[key], target_type)
                         elif key == "$gte":
-                            expression = attr >= _convert_to_alchemy_type(
+                            expression = attr >= convert_to_alchemy_type(
                                 item[key], target_type)
                         elif key == "$gt":
-                            expression = attr > _convert_to_alchemy_type(
+                            expression = attr > convert_to_alchemy_type(
                                 item[key], target_type)
                         elif key == "$like":
                             expression = attr.like("%" + str(item[key]) + "%")
                         elif key == "$in" or key == "$nin":
                             if not isinstance(item[key], list):
                                 raise InvalidMQLException(
-                                    key + " must contain a list.")
+                                    key + " must contain a list: " +
+                                    _get_full_attr_name(attr_name_stack))
                             converted_list = []
                             for value in item[key]:
                                 converted_list.append(
-                                    _convert_to_alchemy_type(
+                                    convert_to_alchemy_type(
                                         value, target_type))
                             expression = attr.in_(converted_list)
                             if key == "$nin":
@@ -255,11 +267,17 @@ def apply_mql_filters(query_session, RecordClass, filters=None,
                                     result = int(item[key][1])
                                 except ValueError:
                                     raise InvalidMQLException(
-                                        "Invalid $mod values supplied.")
+                                        "Non int $mod values supplied: " +
+                                        _get_full_attr_name(attr_name_stack))
                                 expression = attr.op("%")(divider) == result
                             else:
                                 raise InvalidMQLException(
-                                    "Invalid $mod values supplied.")
+                                    "Invalid $mod values supplied: " +
+                                    _get_full_attr_name(attr_name_stack))
+                        else:
+                            raise InvalidMQLException(
+                                "Invalid operator " + key +
+                                _get_full_attr_name(attr_name_stack))
                         query_tree_stack[-1]["expressions"].append(expression)
                     elif _is_whitelisted(RecordClass,
                                          _get_full_attr_name(
@@ -270,7 +288,8 @@ def apply_mql_filters(query_session, RecordClass, filters=None,
                             # this type of search implies an equality
                             # check on an object.
                             raise InvalidMQLException(
-                                "Nested attribute queries are not allowed.")
+                                "Nested attribute queries are not allowed: " +
+                                _get_full_attr_name(attr_name_stack))
                         # Next couple blocks of code help us find
                         # the first new relationship property
                         # in our attr hierarchy.
@@ -400,15 +419,10 @@ def apply_mql_filters(query_session, RecordClass, filters=None,
                                     query_stack.append({"$elemMatch": {
                                         sub_attr_name: item[key]}})
                     else:
-                        if key.startswith("$"):
-                            raise InvalidMQLException(
-                                "Invalid operator: " + key
-                            )
-                        else:
-                            raise InvalidMQLException(
-                                _get_full_attr_name(attr_name_stack, key) +
-                                " is not a whitelisted attribute."
-                            )
+                        raise InvalidMQLException(
+                            _get_full_attr_name(attr_name_stack, key) +
+                            " is not a whitelisted attribute."
+                        )
         if query_tree_stack[-1]["expressions"]:
             query = query.filter(and_(*query_tree_stack[-1]["expressions"]))
     return query
@@ -417,7 +431,7 @@ def apply_mql_filters(query_session, RecordClass, filters=None,
 def _get_full_attr_name(attr_name_stack, short_attr_name=None):
     """Join the attr_name_stack to get a full attribute name."""
     attr_name = ".".join(attr_name_stack)
-    if short_attr_name != "":
+    if short_attr_name:
         if attr_name != "":
             attr_name += "."
         attr_name += short_attr_name
@@ -428,7 +442,7 @@ def _is_whitelisted(RecordClass, attr_name, whitelist):
     """Check if this attr_name is approved to be filtered or sorted."""
     try:
         _get_class_attributes(RecordClass, attr_name)
-    except InvalidMQLException:
+    except AttributeError:
         # RecordClass doesn't contain this attr_name,
         # therefor it can't be queried.
         return False
@@ -467,8 +481,7 @@ def _get_class_attributes(RecordClass, attr_name):
             if (hasattr(root_type, "property") and
                     type(root_type.property) == RelationshipProperty):
                 if len(attr_name) > 0 and (
-                        attr_name.startswith("$id") or
-                        attr_name.startswith("$new")):
+                        attr_name[0].isdigit()):
                     class_attrs.append(inspect(root_type).mapper.class_)
                     continue
                 else:
@@ -477,13 +490,10 @@ def _get_class_attributes(RecordClass, attr_name):
             class_attr = getattr(root_type, attr_name)
             root_type = class_attr
             class_attrs.append(class_attr)
-    if (len(split_attr_name) + 1) != len(class_attrs):
-        raise AttributeError(
-            "The attribute provided does not exist in this class.")
     return class_attrs
 
 
-def _convert_to_alchemy_type(value, alchemy_type):
+def convert_to_alchemy_type(value, alchemy_type):
     """Convert a given value to a sqlalchemy friendly type."""
     text_types = [String, Unicode, Enum, Text, UnicodeText, CHAR, CLOB, NCHAR,
                   NVARCHAR, TEXT, VARCHAR]
@@ -494,46 +504,44 @@ def _convert_to_alchemy_type(value, alchemy_type):
     datetime_types = [DateTime, DATETIME, TIMESTAMP]
     float_types = [Float, Numeric, DECIMAL, FLOAT, NUMERIC, REAL]
     time_types = [Time, TIME]
-    if type(alchemy_type) in int_types:
+    if value is None or str(value).lower() == "null":
+        return None
+    elif alchemy_type in int_types:
         if not isinstance(value, int):
-            result = int(value)
+            return int(value)
         else:
-            result = value
-    elif type(alchemy_type) in text_types:
-        result = str(value)
-    elif type(alchemy_type) in bool_types:
+            return value
+    elif alchemy_type in text_types:
+        return str(value)
+    elif alchemy_type in bool_types:
         if not isinstance(value, bool):
             if (str(value).lower() == "false" or
                     value == "0" or
                     value == 0 or
-                    value is False or
-                    value is None):
-                result = False
+                    value is False):
+                return False
             else:
-                result = True
+                return True
         else:
-            result = value
-    elif type(alchemy_type) in date_types:
+            return value
+    elif alchemy_type in date_types:
         if not isinstance(value, datetime.date):
-            result = datetime.datetime.strptime(value, '%Y-%m-%d').date()
+            return datetime.datetime.strptime(value, '%Y-%m-%d').date()
         else:
-            result = value
-    elif type(alchemy_type) in datetime_types:
+            return value
+    elif alchemy_type in datetime_types:
         if not isinstance(value, datetime.datetime):
-            result = datetime.datetime.strptime(value, '%Y-%m-%d %H:%M:%S')
+            return datetime.datetime.strptime(value, '%Y-%m-%d %H:%M:%S')
         else:
-            result = value
-    elif type(alchemy_type) in float_types:
+            return value
+    elif alchemy_type in float_types:
         if not isinstance(value, float):
-            result = float(value)
+            return float(value)
         else:
-            result = value
-    elif type(alchemy_type) in time_types:
+            return value
+    elif alchemy_type in time_types:
         if not isinstance(value, datetime.time):
-            result = datetime.datetime.strptime(value, '%H:%M:%S').time()
+            return datetime.datetime.strptime(value, '%H:%M:%S').time()
         else:
-            result = value
-    try:
-        return result
-    except NameError:
-        raise InvalidMQLException("Unable to convert value to alchemy type.")
+            return value
+    raise TypeError("Unable to convert value to alchemy type.")

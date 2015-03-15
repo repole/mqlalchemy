@@ -18,19 +18,18 @@ from sqlalchemy.ext.declarative import declarative_base
 Base = declarative_base()
 metadata = Base.metadata
 
-
 class Album(Base):
 
     """SQLAlchemy model for the Album table in our database."""
 
     __tablename__ = 'Album'
 
-    AlbumId = Column(Integer, primary_key=True)
-    Title = Column(Unicode(160), nullable=False)
-    ArtistId = Column(
-        ForeignKey('Artist.ArtistId'), nullable=False, index=True)
+    album_id = Column("AlbumId", Integer, primary_key=True)
+    title = Column("Title", Unicode(160), nullable=False)
+    artist_id = Column(
+        "ArtistId", ForeignKey('Artist.ArtistId'), nullable=False, index=True)
 
-    Artist = relationship('Artist')
+    artist = relationship('Artist')
 
 
 class Artist(Base):
@@ -39,8 +38,8 @@ class Artist(Base):
 
     __tablename__ = 'Artist'
 
-    ArtistId = Column(Integer, primary_key=True)
-    Name = Column(Unicode(120))
+    artist_id = Column("ArtistId", Integer, primary_key=True)
+    name = Column("Name", Unicode(120))
 
 
 class Customer(Base):
@@ -49,21 +48,22 @@ class Customer(Base):
 
     __tablename__ = 'Customer'
 
-    CustomerId = Column(Integer, primary_key=True)
-    FirstName = Column(Unicode(40), nullable=False)
-    LastName = Column(Unicode(20), nullable=False)
-    Company = Column(Unicode(80))
-    Address = Column(Unicode(70))
-    City = Column(Unicode(40))
-    State = Column(Unicode(40))
-    Country = Column(Unicode(40))
-    PostalCode = Column(Unicode(10))
-    Phone = Column(Unicode(24))
-    Fax = Column(Unicode(24))
-    Email = Column(Unicode(60), nullable=False)
-    SupportRepId = Column(ForeignKey('Employee.EmployeeId'), index=True)
+    customer_id = Column("CustomerId", Integer, primary_key=True)
+    first_name = Column("FirstName", Unicode(40), nullable=False)
+    last_name = Column("LastName", Unicode(20), nullable=False)
+    company = Column("Company", Unicode(80))
+    address = Column("Address", Unicode(70))
+    city = Column("City", Unicode(40))
+    state = Column("State", Unicode(40))
+    country = Column("Country", Unicode(40))
+    postal_code = Column("PostalCode", Unicode(10))
+    phone = Column("Phone", Unicode(24))
+    fax = Column("Fax", Unicode(24))
+    email = Column("Email", Unicode(60), nullable=False)
+    support_rep_id = Column(
+        "SupportRepId", ForeignKey('Employee.EmployeeId'), index=True)
 
-    Employee = relationship('Employee')
+    employee = relationship('Employee')
 
 
 class Employee(Base):
@@ -72,23 +72,24 @@ class Employee(Base):
 
     __tablename__ = 'Employee'
 
-    EmployeeId = Column(Integer, primary_key=True)
-    LastName = Column(Unicode(20), nullable=False)
-    FirstName = Column(Unicode(20), nullable=False)
-    Title = Column(Unicode(30))
-    ReportsTo = Column(ForeignKey('Employee.EmployeeId'), index=True)
-    BirthDate = Column(DateTime)
-    HireDate = Column(DateTime)
-    Address = Column(Unicode(70))
-    City = Column(Unicode(40))
-    State = Column(Unicode(40))
-    Country = Column(Unicode(40))
-    PostalCode = Column(Unicode(10))
-    Phone = Column(Unicode(24))
-    Fax = Column(Unicode(24))
-    Email = Column(Unicode(60))
+    employee_id = Column("EmployeeId", Integer, primary_key=True)
+    last_name = Column("LastName", Unicode(20), nullable=False)
+    first_name = Column("FirstName", Unicode(20), nullable=False)
+    title = Column("Title", Unicode(30))
+    reports_to = Column(
+        "ReportsTo", ForeignKey('Employee.EmployeeId'), index=True)
+    birth_date = Column("BirthDate", DateTime)
+    hire_date = Column("HireDate", DateTime)
+    address = Column("Address", Unicode(70))
+    city = Column("City", Unicode(40))
+    state = Column("State", Unicode(40))
+    country = Column("Country", Unicode(40))
+    postal_code = Column("PostalCode", Unicode(10))
+    phone = Column("Phone", Unicode(24))
+    fax = Column("Fax", Unicode(24))
+    email = Column("Email", Unicode(60))
 
-    parent = relationship('Employee', remote_side=[EmployeeId])
+    parent = relationship('Employee', remote_side=[employee_id])
 
 
 class Genre(Base):
@@ -97,8 +98,8 @@ class Genre(Base):
 
     __tablename__ = 'Genre'
 
-    GenreId = Column(Integer, primary_key=True)
-    Name = Column(Unicode(120))
+    genre_id = Column("GenreId", Integer, primary_key=True)
+    name = Column("Name", Unicode(120))
 
 
 class Invoice(Base):
@@ -107,18 +108,19 @@ class Invoice(Base):
 
     __tablename__ = 'Invoice'
 
-    InvoiceId = Column(Integer, primary_key=True)
-    CustomerId = Column(
-        ForeignKey('Customer.CustomerId'), nullable=False, index=True)
-    InvoiceDate = Column(DateTime, nullable=False)
-    BillingAddress = Column(Unicode(70))
-    BillingCity = Column(Unicode(40))
-    BillingState = Column(Unicode(40))
-    BillingCountry = Column(Unicode(40))
-    BillingPostalCode = Column(Unicode(10))
-    Total = Column(Numeric(10, 2), nullable=False)
+    invoice_id = Column("InvoiceId", Integer, primary_key=True)
+    customer_id = Column(
+        "CustomerId", ForeignKey('Customer.CustomerId'),
+        nullable=False, index=True)
+    invoice_date = Column("InvoiceDate", DateTime, nullable=False)
+    billing_address = Column("BillingAddress", Unicode(70))
+    billing_city = Column("BillingCity", Unicode(40))
+    billing_state = Column("BillingState", Unicode(40))
+    billing_country = Column("BillingCountry", Unicode(40))
+    billing_postal_code = Column("BillingPostalCode", Unicode(10))
+    total = Column("Total", Numeric(10, 2), nullable=False)
 
-    Customer = relationship('Customer')
+    customer = relationship('Customer')
 
 
 class InvoiceLine(Base):
@@ -127,15 +129,18 @@ class InvoiceLine(Base):
 
     __tablename__ = 'InvoiceLine'
 
-    InvoiceLineId = Column(Integer, primary_key=True)
-    InvoiceId = Column(
-        ForeignKey('Invoice.InvoiceId'), nullable=False, index=True)
-    TrackId = Column(ForeignKey('Track.TrackId'), nullable=False, index=True)
-    UnitPrice = Column(Numeric(10, 2), nullable=False)
-    Quantity = Column(Integer, nullable=False)
+    invoice_line_id = Column("InvoiceLineId", Integer, primary_key=True)
+    invoice_id = Column(
+        "InvoiceId", ForeignKey('Invoice.InvoiceId'),
+        nullable=False, index=True)
+    track_id = Column(
+        "TrackId", ForeignKey('Track.TrackId'),
+        nullable=False, index=True)
+    unit_price = Column("UnitPrice", Numeric(10, 2), nullable=False)
+    quantity = Column("Quantity", Integer, nullable=False)
 
-    Invoice = relationship('Invoice')
-    Track = relationship('Track')
+    invoice = relationship('Invoice')
+    track = relationship('Track')
 
 
 class MediaType(Base):
@@ -144,8 +149,8 @@ class MediaType(Base):
 
     __tablename__ = 'MediaType'
 
-    MediaTypeId = Column(Integer, primary_key=True)
-    Name = Column(Unicode(120))
+    media_type_id = Column("MediaTypeId", Integer, primary_key=True)
+    name = Column("Name", Unicode(120))
 
 
 class Playlist(Base):
@@ -154,10 +159,11 @@ class Playlist(Base):
 
     __tablename__ = 'Playlist'
 
-    PlaylistId = Column(Integer, primary_key=True)
-    Name = Column(Unicode(120))
+    playlist_id = Column("PlaylistId", Integer, primary_key=True)
+    name = Column("Name", Unicode(120))
 
-    Track = relationship('Track', secondary='PlaylistTrack')
+    tracks = relationship(
+        'Track', secondary='PlaylistTrack', backref="playlists")
 
 
 t_PlaylistTrack = Table(
@@ -182,20 +188,21 @@ class Track(Base):
 
     __tablename__ = 'Track'
 
-    TrackId = Column(Integer, primary_key=True)
-    Name = Column(Unicode(200), nullable=False)
-    AlbumId = Column(ForeignKey('Album.AlbumId'), index=True)
-    MediaTypeId = Column(
-        ForeignKey('MediaType.MediaTypeId'), nullable=False, index=True)
-    GenreId = Column(ForeignKey('Genre.GenreId'), index=True)
-    Composer = Column(Unicode(220))
-    Milliseconds = Column(Integer, nullable=False)
-    Bytes = Column(Integer)
-    UnitPrice = Column(Numeric(10, 2), nullable=False)
+    track_id = Column("TrackId", Integer, primary_key=True)
+    name = Column("Name", Unicode(200), nullable=False)
+    album_id = Column("AlbumId", ForeignKey('Album.AlbumId'), index=True)
+    media_type_id = Column(
+        "MediaTypeId", ForeignKey('MediaType.MediaTypeId'),
+        nullable=False, index=True)
+    genre_id = Column("GenreId", ForeignKey('Genre.GenreId'), index=True)
+    composer = Column("Composer", Unicode(220))
+    milliseconds = Column("Milliseconds", Integer, nullable=False)
+    bytes = Column("Bytes", Integer)
+    unit_price = Column("UnitPrice", Numeric(10, 2), nullable=False)
 
-    Album = relationship('Album')
-    Genre = relationship('Genre')
-    MediaType = relationship('MediaType')
+    album = relationship('Album', backref="tracks")
+    genre = relationship('Genre')
+    media_type = relationship('MediaType')
 
 
 t_sqlite_sequence = Table(

@@ -15,7 +15,9 @@ It can be. When using this with any sort of user input, you'll want to pass in a
 
 **So, can I actually use this for a serious project?**
 
-You probably shouldn't yet in a serious project. There's some basic testing, but this certainly isn't a very mature project yet.
+Maybe? There's some decent test coverage, but this certainly isn't a very mature project yet.
+
+I'll be pretty active in supporting this, so if you are using this and run into problems, I should be pretty quick to fix them.
 
 **Supported Operators**
 
@@ -36,24 +38,33 @@ Custom operators added for convenience:
 * $eq - Explicit equality check.
 * $like - Search a text field for the given value.
 
+Not yet supported, but would like to add:
+* Index based relation queries. Album.tracks.0.track_id won't work.
+* $regex
 
 **Examples?**
 ```python
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from mqlalchemy import apply_mql_filters
-from myapp.mymodels import User
+from myapp.mymodels import Album
 
 # get your sqlalchemy db session here
 db_engine = create_engine("sqlite+pysqlite:///mydb.sqlite")
 DBSession = sessionmaker(bind=db_engine)
 db_session = DBSession()
 
-# define which fields of User are ok to query
-whitelist = ["user_id", "username", "friends.user_id"]
-# get back a user who's id is 1 and who has a friend with id 2
-filters = {"user_id": 1, "friends.user_id": 2}
-query = apply_mql_filters(db_session, User, filters, whitelist)
+# define which fields of Album are ok to query
+whitelist = ["album_id", "artist.name", "tracks.playlists.name"]
+# Find all albums with a track on the "Grunge" playlist or are by
+# Led Zeppelin.
+filters = {
+    "$or": [
+        {"tracks.playlists.name": "Grunge"},
+        {"artist.name": "Led Zeppelin"}
+    ]
+}
+query = apply_mql_filters(db_session, Album, filters, whitelist)
 matching_records = query.all()
 ```
 
@@ -63,9 +74,8 @@ I'm sure my actual syntax parsing is inefficient and has loads of room for impro
 
 
 **TODO**
-* More tests
-* More graceful and informative exception messages
-* Better documentation
-* Split my one massive function into a more maintainable set of functions
+* Include some more complex testing.
+* Improve documentation.
+* Split my one massive function into a more maintainable set of functions.
 
 Certainly open to input and contributions if you'd like to help.
