@@ -1,0 +1,2 @@
+include requirements.txt README.md
+recursive-include mqlalchemy LICENSE chinook.sqlite CHINOOK_LICENSE
