@@ -8,6 +8,7 @@
     :copyright: (c) 2015 by Nicholas Repole.
     :license: BSD - See LICENSE for more details.
 """
+from __future__ import unicode_literals
 from mqlalchemy._compat import str
 from sqlalchemy import and_, or_, not_
 from sqlalchemy.orm import ColumnProperty, RelationshipProperty
