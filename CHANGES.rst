@@ -2,11 +2,24 @@
 Changes
 =======
 
-Release 0.1.2(in development)
-============================
+Release 0.1.3(in development)
+=============================
 
 Incompatible changes
 --------------------
+
+Features added
+--------------
+
+Bugs fixed
+----------
+
+Documentation
+-------------
+
+
+Release 0.1.2
+=============
 
 Features added
 --------------
