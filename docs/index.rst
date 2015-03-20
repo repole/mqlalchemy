@@ -7,7 +7,8 @@
 
 .. toctree::
    :maxdepth: 2
-
+   :hidden:
+   
    changes
    installation
    support
