@@ -8,6 +8,11 @@
 .. toctree::
    :maxdepth: 2
 
+   changes
+   installation
+   support
+
+
 Indices and tables
 ==================
 

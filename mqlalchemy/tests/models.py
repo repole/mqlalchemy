@@ -5,7 +5,8 @@
 
     SQLAlchemy models for the Chinook database.
 
-    :copyright: (c) 2015 by Nicholas Repole.
+    :copyright: (c) 2015 by Nicholas Repole and contributors.
+                See AUTHORS for more details.
     :license: BSD - See LICENSE for more details.
 """
 from sqlalchemy import Column, DateTime, ForeignKey, Integer, Numeric, \

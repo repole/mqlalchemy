@@ -5,7 +5,8 @@
 
     Tests for our new query syntax.
 
-    :copyright: (c) 2015 by Nicholas Repole.
+    :copyright: (c) 2015 by Nicholas Repole and contributors.
+                See AUTHORS for more details.
     :license: BSD - See LICENSE for more details.
 """
 from __future__ import unicode_literals

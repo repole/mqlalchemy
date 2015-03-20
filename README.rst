@@ -5,7 +5,8 @@ MQLAlchemy
 
 Query SQLAlchemy models using MongoDB style syntax.
 
-**Why?**
+Why?
+----
 
 The need arose for me to be able to pass complex database filters from
 client side JavaScript to a Python server. I started building some JSON
@@ -28,7 +29,15 @@ very mature project yet.
 I’ll be pretty active in supporting this, so if you are using this and
 run into problems, I should be pretty quick to fix them.
 
-**Supported Operators**
+**How fast is it?**
+
+I’m sure my actual syntax parsing is inefficient and has loads of room
+for improvement, but the time it takes to parse should be minimal
+compared to the actual database query, so this shouldn’t slow your
+queries down too much.
+
+Supported Operators
+-------------------
 
 -  $and
 -  $or
@@ -53,7 +62,8 @@ Not yet supported, but would like to add:
 -  Index based relation queries. Album.tracks.0.track_id won’t work.
 -  $regex
 
-**Examples?**
+Examples
+--------
 
 .. code:: python
 
@@ -80,14 +90,14 @@ Not yet supported, but would like to add:
     query = apply_mql_filters(db_session, Album, filters, whitelist)
     matching_records = query.all()
 
-**How fast is it?**
+Contributing
+------------
 
-I’m sure my actual syntax parsing is inefficient and has loads of room
-for improvement, but the time it takes to parse should be minimal
-compared to the actual database query, so this shouldn’t slow your
-queries down too much.
+Submit a pull request and make sure to include an updated AUTHORS.rst 
+with your name along with an updated CHANGES.rst.
 
-**License**
+License
+-------
 
 BSD
 
