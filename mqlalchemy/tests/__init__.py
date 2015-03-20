@@ -1,7 +1,7 @@
 ## -*- coding: utf-8 -*-\
 """
     mqlalchemy.tests.__init__
-    ~~~~~
+    ~~~~~~~~~~~~~~~~~~~~~~~~~
 
     Tests for our new query syntax.
 

@@ -1,7 +1,7 @@
 ## -*- coding: utf-8 -*-\
 """
     mqlalchemy.tests.models.py
-    ~~~~~
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~
 
     SQLAlchemy models for the Chinook database.
 
@@ -10,7 +10,7 @@
 """
 from sqlalchemy import Column, DateTime, ForeignKey, Integer, Numeric, \
     Table, Unicode
-from sqlalchemy.orm import relationship
+from sqlalchemy import orm
 from sqlalchemy.sql.sqltypes import NullType
 from sqlalchemy.ext.declarative import declarative_base
 
@@ -29,7 +29,7 @@ class Album(Base):
     artist_id = Column(
         "ArtistId", ForeignKey('Artist.ArtistId'), nullable=False, index=True)
 
-    artist = relationship('Artist')
+    artist = orm.relationship('Artist')
 
 
 class Artist(Base):
@@ -63,7 +63,7 @@ class Customer(Base):
     support_rep_id = Column(
         "SupportRepId", ForeignKey('Employee.EmployeeId'), index=True)
 
-    employee = relationship('Employee')
+    employee = orm.relationship('Employee')
 
 
 class Employee(Base):
@@ -89,7 +89,7 @@ class Employee(Base):
     fax = Column("Fax", Unicode(24))
     email = Column("Email", Unicode(60))
 
-    parent = relationship('Employee', remote_side=[employee_id])
+    parent = orm.relationship('Employee', remote_side=[employee_id])
 
 
 class Genre(Base):
@@ -120,7 +120,7 @@ class Invoice(Base):
     billing_postal_code = Column("BillingPostalCode", Unicode(10))
     total = Column("Total", Numeric(10, 2), nullable=False)
 
-    customer = relationship('Customer')
+    customer = orm.relationship('Customer')
 
 
 class InvoiceLine(Base):
@@ -139,8 +139,8 @@ class InvoiceLine(Base):
     unit_price = Column("UnitPrice", Numeric(10, 2), nullable=False)
     quantity = Column("Quantity", Integer, nullable=False)
 
-    invoice = relationship('Invoice')
-    track = relationship('Track')
+    invoice = orm.relationship('Invoice')
+    track = orm.relationship('Track')
 
 
 class MediaType(Base):
@@ -162,7 +162,7 @@ class Playlist(Base):
     playlist_id = Column("PlaylistId", Integer, primary_key=True)
     name = Column("Name", Unicode(120))
 
-    tracks = relationship(
+    tracks = orm.relationship(
         'Track', secondary='PlaylistTrack', backref="playlists")
 
 
@@ -200,9 +200,9 @@ class Track(Base):
     bytes = Column("Bytes", Integer)
     unit_price = Column("UnitPrice", Numeric(10, 2), nullable=False)
 
-    album = relationship('Album', backref="tracks")
-    genre = relationship('Genre')
-    media_type = relationship('MediaType')
+    album = orm.relationship('Album', backref="tracks")
+    genre = orm.relationship('Genre')
+    media_type = orm.relationship('MediaType')
 
 
 t_sqlite_sequence = Table(

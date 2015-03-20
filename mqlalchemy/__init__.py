@@ -1,7 +1,7 @@
 ## -*- coding: utf-8 -*-\
 """
     mqlalchemy.__init__
-    ~~~~~
+    ~~~~~~~~~~~~~~~~~~~
 
     Query SQLAlchemy objects using MongoDB style syntax.
 
@@ -10,7 +10,7 @@
 """
 from __future__ import unicode_literals
 from mqlalchemy._compat import str
-from sqlalchemy import and_, or_, not_
+import sqlalchemy
 from sqlalchemy.orm import ColumnProperty, RelationshipProperty
 from sqlalchemy.types import String, Text, Unicode, UnicodeText, Enum, \
     Integer, BigInteger, SmallInteger, Boolean, Date, DateTime, Float, \
@@ -35,38 +35,39 @@ def apply_mql_filters(query_session, RecordClass, filters=None,
     """Applies filters to a query and returns it.
 
     Supported operators include:
-    $and
-    $or
-    $not
-    $nor
-    $in
-    $nin
-    $gt
-    $gte
-    $lt
-    $lte
-    $ne
-    $mod
+
+    * $and
+    * $or
+    * $not
+    * $nor
+    * $in
+    * $nin
+    * $gt
+    * $gte
+    * $lt
+    * $lte
+    * $ne
+    * $mod
 
     Custom operators added for convenience:
-    $eq - Explicit equality check.
-    $like - Search a text field for the given value.
+
+    * $eq - Explicit equality check.
+    * $like - Search a text field for the given value.
 
     Considering adding:
-    $regex
-    $size
-    Array index queries - User.sessions.0 would query the first session
-                          for that user. Thus far haven't been able to
-                          find a way to support this easily with
-                          SQLAlchemy.
+
+    * $regex
+    * $size
+    * Array index queries - e.g. Album.tracks.0 to get the first track.
 
     Won't be implemented:
-    $all
-    $exists
-    $text
-    $type
-    $where
-    Exact matches for arrays/relationships
+
+    * $all
+    * $exists
+    * $text
+    * $type
+    * $where
+    * Exact matches for arrays/relationships
 
     This function is massive, but breaking it up seemed to make
     things even harder to follow. Should find a better way of
@@ -78,9 +79,9 @@ def apply_mql_filters(query_session, RecordClass, filters=None,
     :param filters: A dictionary of mongodb style query filters.
     :param whitelist: A list of the attributes that are approved for
                       filtering. If you are querying the User model,
-                      your whitelist might include:
+                      your whitelist might include
                       ["username", "user_id", "sessions.session_id"]
-                      While not including any fields related to
+                      while not including any fields related to
                       passwords or that type of thing.
                       If left as `None`, all attributes will be
                       queryable.
@@ -101,7 +102,7 @@ def apply_mql_filters(query_session, RecordClass, filters=None,
         relation_type_stack = list()
         query_tree_stack = list()
         query_tree_stack.append({
-            "op": and_,
+            "op": sqlalchemy.and_,
             "expressions": []
         })
         query_stack.append(filters)
@@ -121,12 +122,13 @@ def apply_mql_filters(query_session, RecordClass, filters=None,
                     relation_type_stack.pop()
                 elif item == "POP_query_tree_stack":
                     query_tree = query_tree_stack.pop()
-                    if (query_tree["op"] == and_ or
-                            query_tree["op"] == or_):
+                    if (query_tree["op"] == sqlalchemy.and_ or
+                            query_tree["op"] == sqlalchemy.or_):
                         expression = query_tree["op"](
                             *query_tree["expressions"])
-                    elif query_tree["op"] == not_:
-                        expression = not_(query_tree["expressions"][0])
+                    elif query_tree["op"] == sqlalchemy.not_:
+                        expression = sqlalchemy.not_(
+                            query_tree["expressions"][0])
                     else:
                         # should be a .has or .any.
                         # expressions should be a one element list
@@ -142,7 +144,7 @@ def apply_mql_filters(query_session, RecordClass, filters=None,
             if isinstance(item, dict):
                 if len(item.keys()) > 1:
                     query_tree_stack.append({
-                        "op": and_,
+                        "op": sqlalchemy.and_,
                         "expressions": []
                     })
                     query_stack.append("POP_query_tree_stack")
@@ -152,9 +154,9 @@ def apply_mql_filters(query_session, RecordClass, filters=None,
                     key = list(item.keys())[0]
                     if key == "$or" or key == "$and":
                         if key == "$or":
-                            op_func = or_
+                            op_func = sqlalchemy.or_
                         else:
-                            op_func = and_
+                            op_func = sqlalchemy.and_
                         query_tree_stack.append({
                             "op": op_func,
                             "expressions": []
@@ -164,14 +166,14 @@ def apply_mql_filters(query_session, RecordClass, filters=None,
                             query_stack.append(sub_item)
                     elif key == "$not":
                         query_tree_stack.append({
-                            "op": not_,
+                            "op": sqlalchemy.not_,
                             "expressions": []
                         })
                         query_stack.append("POP_query_tree_stack")
                         query_stack.append(item[key])
                     elif key == "$nor":
                         query_tree_stack.append({
-                            "op": not_,
+                            "op": sqlalchemy.not_,
                             "expressions": []
                         })
                         query_stack.append("POP_query_tree_stack")
@@ -260,7 +262,7 @@ def apply_mql_filters(query_session, RecordClass, filters=None,
                                         value, target_type))
                             expression = attr.in_(converted_list)
                             if key == "$nin":
-                                expression = not_(expression)
+                                expression = sqlalchemy.not_(expression)
                         elif key == "$mod":
                             if (isinstance(item[key], list) and
                                     len(item[key]) == 2):
@@ -395,7 +397,7 @@ def apply_mql_filters(query_session, RecordClass, filters=None,
                                         # an exception we aren't
                                         # gracefully catching.
                                         query_tree_stack.append({
-                                            "op": and_,
+                                            "op": sqlalchemy.and_,
                                             "expressions": []
                                         })
                                         query_stack.append(
@@ -430,7 +432,8 @@ def apply_mql_filters(query_session, RecordClass, filters=None,
                             " is not a whitelisted attribute."
                         )
         if query_tree_stack[-1]["expressions"]:
-            query = query.filter(and_(*query_tree_stack[-1]["expressions"]))
+            query = query.filter(
+                sqlalchemy.and_(*query_tree_stack[-1]["expressions"]))
     return query
 
 

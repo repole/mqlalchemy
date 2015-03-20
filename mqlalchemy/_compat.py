@@ -1,7 +1,7 @@
 ## -*- coding: utf-8 -*-\
 """
     mqlalchemy._compat
-    ~~~~~
+    ~~~~~~~~~~~~~~~~~~
 
     Python2/Python3 support helper library.
 
