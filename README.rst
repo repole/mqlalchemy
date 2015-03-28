@@ -106,7 +106,7 @@ MIT
 .. |Coverage Status| image:: https://coveralls.io/repos/repole/mqlalchemy/badge.svg?branch=master
    :target: https://coveralls.io/r/repole/mqlalchemy?branch=master
 .. |Docs| image:: https://readthedocs.org/projects/mqlalchemy/badge/?version=latest
-   :target: https://readthedocs.org/projects/mqlalchemy/?badge=latest
+   :target: http://mqlalchemy.readthedocs.org/en/latest/
 .. |Version| image:: https://pypip.in/version/mqlalchemy/badge.svg
    :target: https://pypi.python.org/pypi/mqlalchemy/
    :alt: Latest Version
