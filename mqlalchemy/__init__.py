@@ -21,7 +21,7 @@ from sqlalchemy.types import String, Text, Unicode, UnicodeText, Enum, \
 from sqlalchemy.inspection import inspect
 import datetime
 
-__version__ = "0.1.3a1"
+__version__ = "0.1.3"
 
 
 class InvalidMQLException(Exception):
