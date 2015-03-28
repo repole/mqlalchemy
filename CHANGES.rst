@@ -2,22 +2,17 @@
 Changes
 =======
 
-Release 0.1.3(in development)
+Release 0.1.3
 =============================
 
 Incompatible changes
 --------------------
 * Changed license from BSD to MIT.
 
-Features added
---------------
-
-Bugs fixed
-----------
-
 Documentation
 -------------
 * Added more badges.
+* Included install instructions for installing from source.
 
 
 Release 0.1.2
