@@ -12,7 +12,7 @@ setup(
     version=version,
     url='https://github.com/repole/mqlalchemy',
     download_url="https://github.com/repole/mqlalchemy/tarball/" + version,
-    license='BSD',
+    license='MIT',
     author='Nicholas Repole',
     author_email='n.repole@gmail.com',
     description='Query SQLAlchemy models with MongoDB syntax.',
