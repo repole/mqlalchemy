@@ -1,7 +1,7 @@
 MQLAlchemy
 ==========
 
-|Build Status| |Coverage Status|
+|Build Status| |Coverage Status| |Docs| |License| |Python Versions| |Python Implementations| |Format|
 
 Query SQLAlchemy models using MongoDB style syntax.
 
@@ -99,9 +99,26 @@ with your name along with an updated CHANGES.rst.
 License
 -------
 
-BSD
+MIT
 
 .. |Build Status| image:: https://travis-ci.org/repole/mqlalchemy.svg?branch=master
    :target: https://travis-ci.org/repole/mqlalchemy
 .. |Coverage Status| image:: https://coveralls.io/repos/repole/mqlalchemy/badge.svg?branch=master
    :target: https://coveralls.io/r/repole/mqlalchemy?branch=master
+.. |Docs| image:: https://readthedocs.org/projects/mqlalchemy/badge/?version=latest
+   :target: https://readthedocs.org/projects/mqlalchemy/?badge=latest
+.. |Version| image:: https://pypip.in/version/mqlalchemy/badge.svg
+   :target: https://pypi.python.org/pypi/mqlalchemy/
+   :alt: Latest Version
+.. |Python Versions| image:: https://pypip.in/py_versions/mqlalchemy/badge.svg
+   :target: https://pypi.python.org/pypi/mqlalchemy/
+   :alt: Supported Python versions
+.. |Python Implementations| image:: https://pypip.in/implementation/mqlalchemy/badge.svg
+   :target: https://pypi.python.org/pypi/mqlalchemy/
+   :alt: Supported Python implementations
+.. |License| image:: https://pypip.in/license/mqlalchemy/badge.svg
+   :target: https://pypi.python.org/pypi/mqlalchemy/
+   :alt: License
+.. |Format| image:: https://pypip.in/format/mqlalchemy/badge.svg
+   :target: https://pypi.python.org/pypi/mqlalchemy/
+   :alt: Download format

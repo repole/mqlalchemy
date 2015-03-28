@@ -7,7 +7,7 @@
 
     :copyright: (c) 2015 by Nicholas Repole and contributors.
                 See AUTHORS for more details.
-    :license: BSD - See LICENSE for more details.
+    :license: MIT - See LICENSE for more details.
 """
 from __future__ import unicode_literals
 from mqlalchemy._compat import str
@@ -21,7 +21,7 @@ from sqlalchemy.types import String, Text, Unicode, UnicodeText, Enum, \
 from sqlalchemy.inspection import inspect
 import datetime
 
-__version__ = "0.1.2"
+__version__ = "0.1.3a1"
 
 
 class InvalidMQLException(Exception):
