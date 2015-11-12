@@ -2,8 +2,21 @@
 Changes
 =======
 
+Release 0.1.4  (in progress)
+============================
+
+Features added
+--------------
+* Ability to convert camelCase search parameters to underscore.
+* Internationalization support for error messages.
+
+Documentation
+-------------
+* Removed now broken badges.
+
+
 Release 0.1.3
-=============================
+=============
 
 Incompatible changes
 --------------------

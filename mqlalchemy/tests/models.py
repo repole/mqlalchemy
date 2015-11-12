@@ -19,6 +19,7 @@ from sqlalchemy.ext.declarative import declarative_base
 Base = declarative_base()
 metadata = Base.metadata
 
+
 class Album(Base):
 
     """SQLAlchemy model for the Album table in our database."""

@@ -120,6 +120,19 @@ class MQLAlchemyTests(unittest.TestCase):
             len(result) == 1 and
             result[0].album_id == 48)
 
+    def test_complex_convert_name(self):
+        """Test that converting from camelCase to underscore works."""
+        query = apply_mql_filters(
+            self.db_session,
+            models.Album,
+            {"tracks.playlists.playlistId": 18},
+            convert_key_names="underscore"
+        )
+        result = query.all()
+        self.assertTrue(
+            len(result) == 1 and
+            result[0].album_id == 48)
+
     def test_explicit_elemmatch(self):
         """Test that an explicit elemMatch."""
         query = apply_mql_filters(

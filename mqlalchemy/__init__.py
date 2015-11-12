@@ -20,8 +20,9 @@ from sqlalchemy.types import String, Text, Unicode, UnicodeText, Enum, \
     SMALLINT, TEXT, TIME, TIMESTAMP, VARCHAR
 from sqlalchemy.inspection import inspect
 import datetime
+import inflection
 
-__version__ = "0.1.3"
+__version__ = "0.2.0dev"
 
 
 class InvalidMQLException(Exception):
@@ -31,8 +32,23 @@ class InvalidMQLException(Exception):
     pass
 
 
+def _convert_key_name(key, mode):
+    """Convert a supplied attr name to a different format.
+
+    :param key: Some attribute name.
+    :param mode: Either 'underscore' or for no operation
+                 `None` or `False`.
+
+    """
+    if not mode:
+        return key
+    elif mode == "underscore":
+        return inflection.underscore(key)
+
+
 def apply_mql_filters(query_session, RecordClass, filters=None,
-                      whitelist=None, stack_size_limit=None):
+                      whitelist=None, stack_size_limit=None,
+                      convert_key_names=False, gettext=str):
     """Applies filters to a query and returns it.
 
     Supported operators include:
@@ -92,14 +108,21 @@ def apply_mql_filters(query_session, RecordClass, filters=None,
                              malicious query attempts.
 
     """
+    # TODO - Improve error messages
     if hasattr(query_session, "query"):
         query = query_session.query(RecordClass)
     else:
         query = query_session
     if filters is not None:
+        # NOTE: Any variable with a c_ prefix is used to store
+        # converted key names, in accordance with convert_key_names
+        # e.g. attr_name_stack = ["someAttr", "otherAttr"]
+        # c_attr_name_stack = ["some_attr", "other_attr"]
         query_stack = list()
+        c_attr_name_stack = list()
         attr_name_stack = list()
         sub_query_name_stack = list()
+        c_sub_query_name_stack = list()
         relation_type_stack = list()
         query_tree_stack = list()
         query_tree_stack.append({
@@ -109,7 +132,9 @@ def apply_mql_filters(query_session, RecordClass, filters=None,
         query_stack.append(filters)
         relation_type_stack.append(RecordClass)
         attr_name_stack.append(RecordClass.__name__)
+        c_attr_name_stack.append(RecordClass.__name__)
         sub_query_name_stack.append(RecordClass.__name__)
+        c_sub_query_name_stack.append(RecordClass.__name__)
         while query_stack:
             if stack_size_limit and len(query_stack) > stack_size_limit:
                 raise InvalidMQLException(
@@ -118,8 +143,10 @@ def apply_mql_filters(query_session, RecordClass, filters=None,
             if isinstance(item, str):
                 if item == "POP_attr_name_stack":
                     attr_name_stack.pop()
+                    c_attr_name_stack.pop()
                 elif item == "POP_sub_query_name_stack":
                     sub_query_name_stack.pop()
+                    c_sub_query_name_stack.pop()
                     relation_type_stack.pop()
                 elif item == "POP_query_tree_stack":
                     query_tree = query_tree_stack.pop()
@@ -153,6 +180,7 @@ def apply_mql_filters(query_session, RecordClass, filters=None,
                         query_stack.append({key: item[key]})
                 elif len(item.keys()) == 1:
                     key = list(item.keys())[0]
+                    c_key = _convert_key_name(key, convert_key_names)
                     if key == "$or" or key == "$and":
                         if key == "$or":
                             op_func = sqlalchemy.or_
@@ -182,19 +210,23 @@ def apply_mql_filters(query_session, RecordClass, filters=None,
                     elif key == "$elemMatch":
                         attr_name = ".".join(attr_name_stack)
                         parent_sub_query_names = ".".join(sub_query_name_stack)
+                        c_attr_name = ".".join(c_attr_name_stack)
+                        c_parent_sub_query_names = ".".join(c_sub_query_name_stack)
                         # trim the parent sub query attrs from
                         # the beginning of the attr_name
                         # note that parent_sub_query_names will always
                         # at least contain RecordClass at the start.
+                        c_sub_query_name = c_attr_name[len(
+                            c_parent_sub_query_names) + 1:]
+                        c_sub_query_name_stack.append(c_sub_query_name)
                         sub_query_name = attr_name[len(
                             parent_sub_query_names) + 1:]
                         sub_query_name_stack.append(sub_query_name)
                         query_stack.append("POP_sub_query_name_stack")
                         query_stack.append("POP_query_tree_stack")
-                        # query_stack.append(")")
                         query_stack.append(item[key])
                         class_attrs = _get_class_attributes(
-                            RecordClass, attr_name)
+                            RecordClass, c_attr_name)
                         SubClass = class_attrs[-1]
                         relation_type_stack.append(SubClass)
                         if (hasattr(SubClass, "property") and
@@ -217,7 +249,7 @@ def apply_mql_filters(query_session, RecordClass, filters=None,
                     elif key.startswith("$"):
                         class_attrs = _get_class_attributes(
                             RecordClass,
-                            ".".join(attr_name_stack))
+                            ".".join(c_attr_name_stack))
                         if (class_attrs and
                                 hasattr(class_attrs[-1], "property") and
                                 type(class_attrs[-1].property) ==
@@ -286,7 +318,7 @@ def apply_mql_filters(query_session, RecordClass, filters=None,
                         query_tree_stack[-1]["expressions"].append(expression)
                     elif _is_whitelisted(RecordClass,
                                          _get_full_attr_name(
-                                             attr_name_stack, key),
+                                             c_attr_name_stack, c_key),
                                          whitelist):
                         if len(attr_name_stack) > len(sub_query_name_stack):
                             # nested attribute queries aren't allowed.
@@ -301,10 +333,13 @@ def apply_mql_filters(query_session, RecordClass, filters=None,
                         # TODO - Do this in a more pythonic way.
                         # find the properties that are relationship
                         # properties in our attr hierarchy.
+                        c_full_attr_name = _get_full_attr_name(
+                            c_attr_name_stack, c_key)
                         full_attr_name = _get_full_attr_name(
                             attr_name_stack, key)
                         class_attrs = _get_class_attributes(
-                            RecordClass, full_attr_name)
+                            RecordClass, c_full_attr_name)
+                        c_split_full_attr = c_full_attr_name.split('.')
                         split_full_attr = full_attr_name.split('.')
                         relation_indexes = []
                         for i, class_attr in enumerate(class_attrs):
@@ -318,7 +353,7 @@ def apply_mql_filters(query_session, RecordClass, filters=None,
                         # that already have subqueries in our
                         # attr hierarchy.
                         # psq stands for parent_sub_query
-                        psq_attr_name = ".".join(sub_query_name_stack)
+                        psq_attr_name = ".".join(c_sub_query_name_stack)
                         psq_class_attrs = _get_class_attributes(
                             RecordClass, psq_attr_name)
                         psq_split_attr_name = psq_attr_name.split('.')
@@ -333,6 +368,7 @@ def apply_mql_filters(query_session, RecordClass, filters=None,
                         if len(psq_relation_indexes) == len(relation_indexes):
                             # There is no new relationship query
                             attr_name_stack.append(key)
+                            c_attr_name_stack.append(c_key)
                             query_stack.append("POP_attr_name_stack")
                             if isinstance(item[key], dict):
                                 query_stack.append(item[key])
@@ -350,6 +386,7 @@ def apply_mql_filters(query_session, RecordClass, filters=None,
                             new_relation_index = relation_indexes[len(
                                 psq_relation_indexes)]
                             attr_name = ""
+                            c_attr_name = ""
                             # get the last relation index from the psq
                             prior_relation_index = 0
                             if len(psq_relation_indexes) > 0:
@@ -357,13 +394,16 @@ def apply_mql_filters(query_session, RecordClass, filters=None,
                             for i in range(prior_relation_index + 1,
                                            new_relation_index + 1):
                                 attr_name += split_full_attr[i]
+                                c_attr_name += c_split_full_attr[i]
                                 next_relation = new_relation_index
                                 if i != next_relation:    # pragma no cover
                                     # failsafe - won't hit this until
                                     # list index based queries are
                                     # implemented.
                                     attr_name += "."
+                                    c_attr_name += "."
                             attr_name_stack.append(attr_name)
+                            c_attr_name_stack.append(c_attr_name)
                             query_stack.append("POP_attr_name_stack")
                             # now parse out any remaining property names.
                             # in the above example, this would be p2
