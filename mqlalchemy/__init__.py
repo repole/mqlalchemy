@@ -22,7 +22,7 @@ from sqlalchemy.inspection import inspect
 import datetime
 import inflection
 
-__version__ = "0.2.0dev"
+__version__ = "0.1.4dev"
 
 
 class InvalidMQLException(Exception):
@@ -30,6 +30,11 @@ class InvalidMQLException(Exception):
     """Generic exception class for invalid queries."""
 
     pass
+
+
+def _dummy_gettext(string, **variables):
+    """Simple gettext stand in for when none is provided."""
+    return string % variables
 
 
 def _convert_key_name(key, mode):
@@ -48,7 +53,7 @@ def _convert_key_name(key, mode):
 
 def apply_mql_filters(query_session, RecordClass, filters=None,
                       whitelist=None, stack_size_limit=None,
-                      convert_key_names=False, gettext=str):
+                      convert_key_names=False, gettext=None):
     """Applies filters to a query and returns it.
 
     Supported operators include:
@@ -106,9 +111,27 @@ def apply_mql_filters(query_session, RecordClass, filters=None,
                              allowable complexity of the provided
                              filters. Can be useful in proventing
                              malicious query attempts.
+    :param convert_key_names: Allows for the field names of queries
+                              to be converted from one convention
+                              to another. For example, queries come
+                              in with camelCase names that need to
+                              be converted to underscore separated
+                              names. {"myAttrName": 5} becomes
+                              {"my_attr_name": 5}. This may be
+                              useful if you are building an API
+                              with JavaScript naming conventions
+                              and need to convert those field names
+                              back to Python conventions.
+    :param gettext: Supply a translation function to convert error
+                    messages to the desired language. Note that no
+                    translations are included by default, you must
+                    generate your own.
 
     """
     # TODO - Improve error messages
+    if gettext is None:
+        gettext = _dummy_gettext
+    _ = gettext
     if hasattr(query_session, "query"):
         query = query_session.query(RecordClass)
     else:
@@ -164,8 +187,8 @@ def apply_mql_filters(query_session, RecordClass, filters=None,
                                 "expressions"]) != 1:    # pragma no cover
                             # failsafe - Should never reach here.
                             raise InvalidMQLException(
-                                "Unexpected error. Too many binary " +
-                                "expressions for this operator.")
+                                _("Unexpected error. Too many binary " +
+                                  "expressions for this operator."))
                         expression = query_tree["op"](
                             query_tree["expressions"][0])
                     query_tree_stack[-1]["expressions"].append(expression)
@@ -230,8 +253,8 @@ def apply_mql_filters(query_session, RecordClass, filters=None,
                         SubClass = class_attrs[-1]
                         relation_type_stack.append(SubClass)
                         if (hasattr(SubClass, "property") and
-                                type(SubClass.property) ==
-                                RelationshipProperty):
+                                isinstance(SubClass.property,
+                                           RelationshipProperty)):
                             if not SubClass.property.uselist:
                                 query_tree_stack.append({
                                     "op": SubClass.has,
@@ -244,7 +267,7 @@ def apply_mql_filters(query_session, RecordClass, filters=None,
                                 })
                         else:
                             raise InvalidMQLException(
-                                "$elemMatch not applied to subobject: " +
+                                _("$elemMatch not applied to subobject: ") +
                                 attr_name)
                     elif key.startswith("$"):
                         class_attrs = _get_class_attributes(
@@ -252,8 +275,8 @@ def apply_mql_filters(query_session, RecordClass, filters=None,
                             ".".join(c_attr_name_stack))
                         if (class_attrs and
                                 hasattr(class_attrs[-1], "property") and
-                                type(class_attrs[-1].property) ==
-                                ColumnProperty):
+                                isinstance(class_attrs[-1].property,
+                                           ColumnProperty)):
                             target_type = type(
                                 class_attrs[-1].property.columns[0].type)
                             attr = class_attrs[-1]
@@ -261,7 +284,7 @@ def apply_mql_filters(query_session, RecordClass, filters=None,
                             # failsafe - should never hit this
                             # due to earlier checks
                             raise InvalidMQLException(
-                                "Relation can't be checked for equality: " +
+                                _("Relation can't be checked for equality: ") +
                                 _get_full_attr_name(attr_name_stack, key))
                         if key == "$lt":
                             expression = attr < convert_to_alchemy_type(
@@ -286,7 +309,8 @@ def apply_mql_filters(query_session, RecordClass, filters=None,
                         elif key == "$in" or key == "$nin":
                             if not isinstance(item[key], list):
                                 raise InvalidMQLException(
-                                    key + " must contain a list: " +
+                                    _("%(attr)s must contain a list: ",
+                                      attr=key) +
                                     _get_full_attr_name(attr_name_stack))
                             converted_list = []
                             for value in item[key]:
@@ -304,16 +328,17 @@ def apply_mql_filters(query_session, RecordClass, filters=None,
                                     result = int(item[key][1])
                                 except ValueError:
                                     raise InvalidMQLException(
-                                        "Non int $mod values supplied: " +
+                                        _("Non int $mod values supplied: ") +
                                         _get_full_attr_name(attr_name_stack))
                                 expression = attr.op("%")(divider) == result
                             else:
                                 raise InvalidMQLException(
-                                    "Invalid $mod values supplied: " +
+                                    _("Invalid $mod values supplied: ") +
                                     _get_full_attr_name(attr_name_stack))
                         else:
                             raise InvalidMQLException(
-                                "Invalid operator " + key +
+                                _("Invalid operator %(operator)s",
+                                  operator=key) +
                                 _get_full_attr_name(attr_name_stack))
                         query_tree_stack[-1]["expressions"].append(expression)
                     elif _is_whitelisted(RecordClass,
@@ -325,7 +350,8 @@ def apply_mql_filters(query_session, RecordClass, filters=None,
                             # this type of search implies an equality
                             # check on an object.
                             raise InvalidMQLException(
-                                "Nested attribute queries are not allowed: " +
+                                _("Nested attribute queries are not " +
+                                  "allowed: ") +
                                 _get_full_attr_name(attr_name_stack))
                         # Next couple blocks of code help us find
                         # the first new relationship property
@@ -344,8 +370,8 @@ def apply_mql_filters(query_session, RecordClass, filters=None,
                         relation_indexes = []
                         for i, class_attr in enumerate(class_attrs):
                             if (hasattr(class_attr, "property") and
-                                    type(class_attr.property) ==
-                                    RelationshipProperty):
+                                    isinstance(class_attr.property,
+                                               RelationshipProperty)):
                                 if (i == len(class_attrs) - 1 or not
                                         split_full_attr[i+1][0].isdigit()):
                                     relation_indexes.append(i)
@@ -360,8 +386,8 @@ def apply_mql_filters(query_session, RecordClass, filters=None,
                         psq_relation_indexes = []
                         for i, class_attr in enumerate(psq_class_attrs):
                             if (hasattr(class_attr, "property") and
-                                    type(class_attr.property) ==
-                                    RelationshipProperty):
+                                    isinstance(class_attr.property,
+                                               RelationshipProperty)):
                                 if (i == len(psq_class_attrs) - 1 or not
                                         psq_split_attr_name[i+1][0].isdigit()):
                                     psq_relation_indexes.append(i)
@@ -405,8 +431,9 @@ def apply_mql_filters(query_session, RecordClass, filters=None,
                             attr_name_stack.append(attr_name)
                             c_attr_name_stack.append(c_attr_name)
                             query_stack.append("POP_attr_name_stack")
-                            # now parse out any remaining property names.
-                            # in the above example, this would be p2
+                            # now parse out any remaining property
+                            # names.
+                            # In the above example, this would be p2
                             sub_attr_name = ""
                             for i in range(new_relation_index + 1,
                                            len(split_full_attr)):
@@ -426,11 +453,12 @@ def apply_mql_filters(query_session, RecordClass, filters=None,
                                         sub_attr_name: item[key]}})
                                 else:
                                     if not len(item[key].keys()) > 0:
-                                        # dictionary has no keys, invalid query.
+                                        # dictionary has no keys.
+                                        # invalid query.
                                         raise InvalidMQLException(
-                                            "Attribute " + full_attr_name +
-                                            " can't be compared to an empty " +
-                                            " dictionary.")
+                                            _("Attribute can't be compared " +
+                                              "to an empty dictionary: ") +
+                                            full_attr_name)
                                     else:
                                         # TODO - may also want to check
                                         # for invalid sub_keys. A bad
@@ -460,8 +488,8 @@ def apply_mql_filters(query_session, RecordClass, filters=None,
                                     # is no sub_attr, so we're trying to
                                     # equality check a relation.
                                     raise InvalidMQLException(
-                                        "Relation " + full_attr_name +
-                                        " can't be checked for equality.")
+                                        _("Relation can't be checked for " +
+                                          "equality: ") + full_attr_name)
                                 else:
                                     # must have a sub_attr, so turn into
                                     # an elemMatch for that sub_attr.
@@ -469,8 +497,8 @@ def apply_mql_filters(query_session, RecordClass, filters=None,
                                         sub_attr_name: item[key]}})
                     else:
                         raise InvalidMQLException(
-                            _get_full_attr_name(attr_name_stack) +
-                            " is not a whitelisted attribute."
+                            _("%(attr)s is not a whitelisted attribute.",
+                              attr=_get_full_attr_name(attr_name_stack))
                         )
         if query_tree_stack[-1]["expressions"]:
             query = query.filter(
@@ -529,7 +557,8 @@ def _get_class_attributes(RecordClass, attr_name):
     if len(split_attr_name) > 0:
         for attr_name in split_attr_name:
             if (hasattr(root_type, "property") and
-                    type(root_type.property) == RelationshipProperty):
+                    isinstance(root_type.property,
+                               RelationshipProperty)):
                 if len(attr_name) > 0 and (
                         attr_name[0].isdigit()):
                     class_attrs.append(inspect(root_type).mapper.class_)
