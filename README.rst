@@ -90,6 +90,9 @@ Examples
     query = apply_mql_filters(db_session, Album, filters, whitelist)
     matching_records = query.all()
 
+For more, please see the included tests, as they're probably the
+easiest way to get an idea of how the library can be used.
+
 Contributing
 ------------
 

@@ -5,7 +5,7 @@
 
     SQLAlchemy models for the Chinook database.
 
-    :copyright: (c) 2015 by Nicholas Repole and contributors.
+    :copyright: (c) 2016 by Nicholas Repole and contributors.
                 See AUTHORS for more details.
     :license: MIT - See LICENSE for more details.
 """

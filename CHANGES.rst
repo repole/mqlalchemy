@@ -2,8 +2,26 @@
 Changes
 =======
 
-Release 0.1.4  (in progress)
-============================
+Release 0.2.0 (in progress)
+===========================
+
+Incompatible changes
+--------------------
+* convert_key_names parameter for apply_mql_filters removed.
+* convert_key_names_func parameter for apply_mql_filters added.
+* All RecordClass parameters names changed to model_class.
+
+Features added
+--------------
+* May also now pass in a function instead of a whitelist.
+
+Documentation
+-------------
+* Changed docstring format to match Google's style guide.
+
+
+Release 0.1.4
+=============
 
 Features added
 --------------

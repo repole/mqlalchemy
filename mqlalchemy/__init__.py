@@ -5,7 +5,7 @@
 
     Query SQLAlchemy objects using MongoDB style syntax.
 
-    :copyright: (c) 2015 by Nicholas Repole and contributors.
+    :copyright: (c) 2016 by Nicholas Repole and contributors.
                 See AUTHORS for more details.
     :license: MIT - See LICENSE for more details.
 """
@@ -20,12 +20,11 @@ from sqlalchemy.types import String, Text, Unicode, UnicodeText, Enum, \
     SMALLINT, TEXT, TIME, TIMESTAMP, VARCHAR
 from sqlalchemy.inspection import inspect
 import datetime
-import inflection
 
 
 __all__ = [b"apply_mql_filters", b"InvalidMQLException",
            b"convert_to_alchemy_type"]
-__version__ = "0.1.4"
+__version__ = "0.2.0dev"
 
 
 class InvalidMQLException(Exception):
@@ -40,23 +39,9 @@ def _dummy_gettext(string, **variables):
     return string % variables
 
 
-def _convert_key_name(key, mode):
-    """Convert a supplied attr name to a different format.
-
-    :param key: Some attribute name.
-    :param mode: Either 'underscore' or for no operation
-                 `None` or `False`.
-
-    """
-    if not mode:
-        return key
-    elif mode == "underscore":
-        return inflection.underscore(key)
-
-
-def apply_mql_filters(query_session, RecordClass, filters=None,
+def apply_mql_filters(query_session, model_class, filters=None,
                       whitelist=None, stack_size_limit=None,
-                      convert_key_names=False, gettext=None):
+                      convert_key_names_func=None, gettext=None):
     """Applies filters to a query and returns it.
 
     Supported operators include:
@@ -98,45 +83,62 @@ def apply_mql_filters(query_session, RecordClass, filters=None,
     things even harder to follow. Should find a better way of
     breaking things up, but for now, accept my apologies.
 
-    :param query_session: A db session or query object. Filters are
-                          applied to this object.
-    :param RecordClass: The sqlalchemy model class you want to query.
-    :param filters: A dictionary of mongodb style query filters.
-    :param whitelist: A list of the attributes that are approved for
-                      filtering. If you are querying the User model,
-                      your whitelist might include
-                      ["username", "user_id", "sessions.session_id"]
-                      while not including any fields related to
-                      passwords or that type of thing.
-                      If left as `None`, all attributes will be
-                      queryable.
-    :param stack_size_limit: Optoinal paramater used to limit the
-                             allowable complexity of the provided
-                             filters. Can be useful in proventing
-                             malicious query attempts.
-    :param convert_key_names: Allows for the field names of queries
-                              to be converted from one convention
-                              to another. For example, queries come
-                              in with camelCase names that need to
-                              be converted to underscore separated
-                              names. {"myAttrName": 5} becomes
-                              {"my_attr_name": 5}. This may be
-                              useful if you are building an API
-                              with JavaScript naming conventions
-                              and need to convert those field names
-                              back to Python conventions.
-    :param gettext: Supply a translation function to convert error
-                    messages to the desired language. Note that no
-                    translations are included by default, you must
-                    generate your own.
+    Args:
+        query_session: A db session or query object. Filters are applied
+            to this object.
+        model_class: The sqlalchemy model class you want to query.
+        filters: A dictionary of MongoDB style query filters.
+        whitelist: May either be a function, a list, or `None`. If a
+            function is provided, it should take in a dot separated
+            field name and return `True` if it is acceptable to query
+            that field, or `False` if not. If a list of fieldnames is
+            provided, field names will be checked against that list
+            to determine whether or not it is an allowed field to be
+            queried. If `None` is provided, all fields and relationships
+            of a model will be queryable. Also note that the field name
+            being checked will already have been converted by
+            convert_key_names_func if provided.
+        convert_key_names_func: Optional function used to convert
+            a provided attribute name into a field name for a model.
+            Should take one parameter, which is a dot separated
+            name, and should return a converted string in the same
+            dot separated format. For example, say you want to
+            be able to query your model, which contains field names
+            with underscores, using lowerCamelCase instead. The
+            provided function should take a string such as
+            "tracks.unitPrice" and convert it to "tracks.unit_price".
+            For the sake of raising more useful exceptions, the function
+            should return `None` if an invalid field name is provided,
+            however this is not necessary.
+        stack_size_limit: Optional parameter used to limit the allowable
+            complexity of the provided filters. Can be useful in
+            preventing malicious query attempts.
+        gettext: Supply a translation function to convert error messages
+            to the desired language. Note that no translations are
+            included by default, you must generate your own.
 
     """
     # TODO - Improve error messages
+    if convert_key_names_func is None:
+        def convert_key_names_func(x): return x
+    if isinstance(whitelist, list):
+        def is_whitelisted(attr_name):
+            """Uses the default, built in whitelist checker."""
+            return _is_whitelisted(model_class, attr_name, whitelist)
+    elif callable(whitelist):
+        def is_whitelisted(attr_name):
+            """Uses the provided whitelist function."""
+            return whitelist(attr_name)
+    else:
+        def is_whitelisted(attr_name):
+            """All attributes will be queryable."""
+            if attr_name:
+                return True
     if gettext is None:
         gettext = _dummy_gettext
     _ = gettext
     if hasattr(query_session, "query"):
-        query = query_session.query(RecordClass)
+        query = query_session.query(model_class)
     else:
         query = query_session
     if filters is not None:
@@ -156,11 +158,11 @@ def apply_mql_filters(query_session, RecordClass, filters=None,
             "expressions": []
         })
         query_stack.append(filters)
-        relation_type_stack.append(RecordClass)
-        attr_name_stack.append(RecordClass.__name__)
-        c_attr_name_stack.append(RecordClass.__name__)
-        sub_query_name_stack.append(RecordClass.__name__)
-        c_sub_query_name_stack.append(RecordClass.__name__)
+        relation_type_stack.append(model_class)
+        attr_name_stack.append(model_class.__name__)
+        c_attr_name_stack.append(model_class.__name__)
+        sub_query_name_stack.append(model_class.__name__)
+        c_sub_query_name_stack.append(model_class.__name__)
         while query_stack:
             if stack_size_limit and len(query_stack) > stack_size_limit:
                 raise InvalidMQLException(
@@ -196,7 +198,7 @@ def apply_mql_filters(query_session, RecordClass, filters=None,
                             query_tree["expressions"][0])
                     query_tree_stack[-1]["expressions"].append(expression)
             if isinstance(item, dict):
-                if len(item.keys()) > 1:
+                if len(item) > 1:
                     query_tree_stack.append({
                         "op": sqlalchemy.and_,
                         "expressions": []
@@ -204,9 +206,23 @@ def apply_mql_filters(query_session, RecordClass, filters=None,
                     query_stack.append("POP_query_tree_stack")
                     for key in item:
                         query_stack.append({key: item[key]})
-                elif len(item.keys()) == 1:
+                elif len(item) == 1:
+                    # Given an attr stack ["Album", "tracks.playlists"]
+                    # Current key of "playlist_id"
+                    # Convert the key name using the full_attr_name,
+                    # converting it, and chopping off the previous attr
+                    # names that were in the attr stack from the start.
                     key = list(item.keys())[0]
-                    c_key = _convert_key_name(key, convert_key_names)
+                    if not key.startswith("$"):
+                        full_attr_name = _get_full_attr_name(
+                            attr_name_stack[1:], key)
+                        c_full_attr_name = convert_key_names_func(
+                            full_attr_name)
+                        split_c_attr_name = c_full_attr_name.split(".")
+                        c_key = ".".join(
+                            split_c_attr_name[-len(key.split(".")):])
+                    else:
+                        c_key = None
                     if key == "$or" or key == "$and":
                         if key == "$or":
                             op_func = sqlalchemy.or_
@@ -237,11 +253,12 @@ def apply_mql_filters(query_session, RecordClass, filters=None,
                         attr_name = ".".join(attr_name_stack)
                         parent_sub_query_names = ".".join(sub_query_name_stack)
                         c_attr_name = ".".join(c_attr_name_stack)
-                        c_parent_sub_query_names = ".".join(c_sub_query_name_stack)
+                        c_parent_sub_query_names = ".".join(
+                            c_sub_query_name_stack)
                         # trim the parent sub query attrs from
                         # the beginning of the attr_name
                         # note that parent_sub_query_names will always
-                        # at least contain RecordClass at the start.
+                        # at least contain model_class at the start.
                         c_sub_query_name = c_attr_name[len(
                             c_parent_sub_query_names) + 1:]
                         c_sub_query_name_stack.append(c_sub_query_name)
@@ -251,21 +268,22 @@ def apply_mql_filters(query_session, RecordClass, filters=None,
                         query_stack.append("POP_sub_query_name_stack")
                         query_stack.append("POP_query_tree_stack")
                         query_stack.append(item[key])
+                        # [1:] to chop model_class from start of name stack
                         class_attrs = _get_class_attributes(
-                            RecordClass, c_attr_name)
-                        SubClass = class_attrs[-1]
-                        relation_type_stack.append(SubClass)
-                        if (hasattr(SubClass, "property") and
-                                isinstance(SubClass.property,
+                            model_class, ".".join(c_attr_name_stack[1:]))
+                        sub_class = class_attrs[-1]
+                        relation_type_stack.append(sub_class)
+                        if (hasattr(sub_class, "property") and
+                                isinstance(sub_class.property,
                                            RelationshipProperty)):
-                            if not SubClass.property.uselist:
+                            if not sub_class.property.uselist:
                                 query_tree_stack.append({
-                                    "op": SubClass.has,
+                                    "op": sub_class.has,
                                     "expressions": []
                                 })
                             else:
                                 query_tree_stack.append({
-                                    "op": SubClass.any,
+                                    "op": sub_class.any,
                                     "expressions": []
                                 })
                         else:
@@ -274,8 +292,8 @@ def apply_mql_filters(query_session, RecordClass, filters=None,
                                 attr_name)
                     elif key.startswith("$"):
                         class_attrs = _get_class_attributes(
-                            RecordClass,
-                            ".".join(c_attr_name_stack))
+                            model_class,
+                            ".".join(c_attr_name_stack[1:]))
                         if (class_attrs and
                                 hasattr(class_attrs[-1], "property") and
                                 isinstance(class_attrs[-1].property,
@@ -344,10 +362,8 @@ def apply_mql_filters(query_session, RecordClass, filters=None,
                                   operator=key) +
                                 _get_full_attr_name(attr_name_stack))
                         query_tree_stack[-1]["expressions"].append(expression)
-                    elif _is_whitelisted(RecordClass,
-                                         _get_full_attr_name(
-                                             c_attr_name_stack, c_key),
-                                         whitelist):
+                    elif is_whitelisted(_get_full_attr_name(
+                            c_attr_name_stack[1:], c_key)):
                         if len(attr_name_stack) > len(sub_query_name_stack):
                             # nested attribute queries aren't allowed.
                             # this type of search implies an equality
@@ -367,7 +383,8 @@ def apply_mql_filters(query_session, RecordClass, filters=None,
                         full_attr_name = _get_full_attr_name(
                             attr_name_stack, key)
                         class_attrs = _get_class_attributes(
-                            RecordClass, c_full_attr_name)
+                            model_class, _get_full_attr_name(
+                                c_attr_name_stack[1:], c_key))
                         c_split_full_attr = c_full_attr_name.split('.')
                         split_full_attr = full_attr_name.split('.')
                         relation_indexes = []
@@ -384,7 +401,7 @@ def apply_mql_filters(query_session, RecordClass, filters=None,
                         # psq stands for parent_sub_query
                         psq_attr_name = ".".join(c_sub_query_name_stack)
                         psq_class_attrs = _get_class_attributes(
-                            RecordClass, psq_attr_name)
+                            model_class, ".".join(c_sub_query_name_stack[1:]))
                         psq_split_attr_name = psq_attr_name.split('.')
                         psq_relation_indexes = []
                         for i, class_attr in enumerate(psq_class_attrs):
@@ -407,9 +424,9 @@ def apply_mql_filters(query_session, RecordClass, filters=None,
                             # Parse out the next relation sub query
                             # e.g.
                             # full_attr_name =
-                            # RClass.prop1.Relation1.prop2.Relation2.p2
+                            # rclass.prop1.Relation1.prop2.Relation2.p2
                             # sub_query_name_stack =
-                            # [RClass, prop1.Relation1]
+                            # [rclass, prop1.Relation1]
                             # result:
                             # prop2.Releation2
                             new_relation_index = relation_indexes[len(
@@ -519,45 +536,42 @@ def _get_full_attr_name(attr_name_stack, short_attr_name=None):
     return attr_name
 
 
-def _is_whitelisted(RecordClass, attr_name, whitelist):
+def _is_whitelisted(model_class, attr_name, whitelist):
     """Check if this attr_name is approved to be filtered or sorted."""
     try:
-        _get_class_attributes(RecordClass, attr_name)
+        _get_class_attributes(model_class, attr_name)
     except AttributeError:
-        # RecordClass doesn't contain this attr_name,
+        # model_class doesn't contain this attr_name,
         # therefor it can't be queried.
         return False
-    if whitelist is None:
+    split_attr = attr_name.split(".")
+    # parse out any list indexes. List1.0.other becomes Lis1.other
+    attr_name = [attr for attr in split_attr if not attr[0].isdigit()]
+    attr_name = ".".join([str(name) for name in attr_name])
+    if attr_name in whitelist:
         return True
-    attr_name = str(attr_name)
-    if attr_name.startswith(RecordClass.__name__):
-        attr_name = attr_name[(len(RecordClass.__name__) + 1):]
-        split_attr = attr_name.split(".")
-        # parse out any list indexes. List1.0.other becomes Lis1.other
-        attr_name = [attr for attr in split_attr if not attr[0].isdigit()]
-        attr_name = ".".join([str(name) for name in attr_name])
-        if attr_name in whitelist:
-            return True
     return False
 
 
-def _get_class_attributes(RecordClass, attr_name):
+def _get_class_attributes(model_class, attr_name):
     """Get info about each attr given a dot notation attr name.
 
     :raises: AttributeError if an invalid attribute name is given.
     :returns: A list of attributes corresponding to the given
-              attr_name for the provided RecordClass.
+              attr_name for the provided model_class.
 
     """
     split_attr_name = attr_name.split(".")
-    # We assume the full attr name includes the RecordClass
+    # We assume the full attr name includes the model_class
     # Thus we pop the first name.
-    # e.g. RecordClass.prop.subprop becomes prop.subprop
-    split_attr_name.pop(0)
+    # e.g. model_class.prop.subprop becomes prop.subprop
     class_attrs = []
-    root_type = RecordClass
+    root_type = model_class
     class_attrs.append(root_type)
-    if len(split_attr_name) > 0:
+    if len(split_attr_name) == 1 and split_attr_name[0] == '':
+        # empty attr_name was provided
+        return class_attrs
+    elif len(split_attr_name) > 0:
         for attr_name in split_attr_name:
             if (hasattr(root_type, "property") and
                     isinstance(root_type.property,

@@ -5,7 +5,7 @@
 
     Tests for our new query syntax.
 
-    :copyright: (c) 2015 by Nicholas Repole and contributors.
+    :copyright: (c) 2016 by Nicholas Repole and contributors.
                 See AUTHORS for more details.
     :license: MIT - See LICENSE for more details.
 """
@@ -122,11 +122,13 @@ class MQLAlchemyTests(unittest.TestCase):
 
     def test_complex_convert_name(self):
         """Test that converting from camelCase to underscore works."""
+        def to_lower(txt):
+            return str(txt).lower()
         query = apply_mql_filters(
             self.db_session,
             models.Album,
-            {"tracks.playlists.playlistId": 18},
-            convert_key_names="underscore"
+            {"TRACKS.PLAYLISTS.PLAYLIST_ID": 18},
+            convert_key_names_func=to_lower
         )
         result = query.all()
         self.assertTrue(
@@ -492,8 +494,8 @@ class MQLAlchemyTests(unittest.TestCase):
         self.assertFalse(
             mqlalchemy._is_whitelisted(
                 models.Album,
-                "Album.bad_attr_name",
-                ["Album.bad_attr_name"]
+                "bad_attr_name",
+                ["bad_attr_name"]
             )
         )
         query = apply_mql_filters(
@@ -507,6 +509,32 @@ class MQLAlchemyTests(unittest.TestCase):
             len(result) == 2 and
             ((result[0].playlist_id == 1 and result[1].playlist_id == 8) or
              (result[0].playlist_id == 8 and result[1].playlist_id == 1)))
+
+    def test_custom_whitelist_func(self):
+        """Test that providing a whitelist function works."""
+        def whitelist(attr_name):
+            if attr_name == "tracks.track_id":
+                return True
+            return False
+        query = apply_mql_filters(
+            self.db_session,
+            models.Playlist,
+            {"tracks.track_id": 7},
+            whitelist
+        )
+        result = query.all()
+        self.assertTrue(
+            len(result) == 2 and
+            ((result[0].playlist_id == 1 and result[1].playlist_id == 8) or
+             (result[0].playlist_id == 8 and result[1].playlist_id == 1)))
+        self.assertRaises(
+            InvalidMQLException,
+            apply_mql_filters,
+            self.db_session,
+            models.Playlist,
+            {"tracks.name": "Test"},
+            whitelist
+        )
 
     def test_convert_to_int(self):
         """Test that we can convert a string to integer."""
@@ -577,7 +605,7 @@ class MQLAlchemyTests(unittest.TestCase):
         """Test that _get_class_attributes works."""
         class_attrs = mqlalchemy._get_class_attributes(
             models.Album,
-            "Album.tracks.0.track_id")
+            "tracks.0.track_id")
         self.assertTrue(len(class_attrs) == 4)
 
     def test_stack_size_limit(self):
