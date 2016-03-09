@@ -11,6 +11,7 @@
 """
 from __future__ import unicode_literals
 from mqlalchemy._compat import str
+from mqlalchemy.utils import dummy_gettext
 import sqlalchemy
 from sqlalchemy.orm import ColumnProperty, RelationshipProperty
 from sqlalchemy.types import String, Text, Unicode, UnicodeText, Enum, \
@@ -24,7 +25,7 @@ import datetime
 
 __all__ = [b"apply_mql_filters", b"InvalidMQLException",
            b"convert_to_alchemy_type"]
-__version__ = "0.2.0dev"
+__version__ = "0.2.0"
 
 
 class InvalidMQLException(Exception):
@@ -32,11 +33,6 @@ class InvalidMQLException(Exception):
     """Generic exception class for invalid queries."""
 
     pass
-
-
-def _dummy_gettext(string, **variables):
-    """Simple gettext stand in for when none is provided."""
-    return string % variables
 
 
 def apply_mql_filters(query_session, model_class, filters=None,
@@ -135,7 +131,7 @@ def apply_mql_filters(query_session, model_class, filters=None,
             if attr_name:
                 return True
     if gettext is None:
-        gettext = _dummy_gettext
+        gettext = dummy_gettext
     _ = gettext
     if hasattr(query_session, "query"):
         query = query_session.query(model_class)

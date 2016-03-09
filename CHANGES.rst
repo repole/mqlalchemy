@@ -2,8 +2,8 @@
 Changes
 =======
 
-Release 0.2.0 (in progress)
-===========================
+Release 0.2.0
+=============
 
 Incompatible changes
 --------------------
@@ -57,7 +57,7 @@ Bugs fixed
 ----------
 * Model relationship attributes were causing documentation issues.
   Changed a few imports to work around the issue.
- 
+
 Documentation
 -------------
 * Added basic Sphinx documentation.
