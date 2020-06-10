@@ -2,14 +2,31 @@
 Changes
 =======
 
+Release 0.3.0 (WIP)
+===================
+
+Incompatible changes
+--------------------
+* ``InvalidMQLException`` renamed to ``InvalidMqlException``.
+
+Features added
+--------------
+* May now pass in ``required_filters`` to help ease enforcing read permissions.
+* Added more descriptive error classes.
+
+Documentation
+-------------
+* Changed docstring format back to standard Sphinx format.
+
+
 Release 0.2.0
 =============
 
 Incompatible changes
 --------------------
-* convert_key_names parameter for apply_mql_filters removed.
-* convert_key_names_func parameter for apply_mql_filters added.
-* All RecordClass parameters names changed to model_class.
+* convert_key_names parameter for ``apply_mql_filters`` removed.
+* convert_key_names_func parameter for ``apply_mql_filters`` added.
+* All ``RecordClass`` parameters names changed to ``model_class``.
 
 Features added
 --------------

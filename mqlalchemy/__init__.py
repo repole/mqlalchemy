@@ -5,7 +5,9 @@
 
     Query SQLAlchemy objects using MongoDB style syntax.
 
-    :copyright: (c) 2016 by Nicholas Repole and contributors.
+    Mainly useful in providing a querying interface from JavaScript.
+
+    :copyright: (c) 2020 by Nicholas Repole and contributors.
                 See AUTHORS for more details.
     :license: MIT - See LICENSE for more details.
 """
@@ -14,30 +16,69 @@ from mqlalchemy._compat import str
 from mqlalchemy.utils import dummy_gettext
 import sqlalchemy
 from sqlalchemy.orm import ColumnProperty, RelationshipProperty
-from sqlalchemy.types import String, Text, Unicode, UnicodeText, Enum, \
-    Integer, BigInteger, SmallInteger, Boolean, Date, DateTime, Float, \
-    Numeric, Time, BIGINT, BOOLEAN, CHAR, CLOB, DATE, DATETIME, \
-    DECIMAL, FLOAT, INT, INTEGER, NCHAR, NVARCHAR, NUMERIC, REAL, \
-    SMALLINT, TEXT, TIME, TIMESTAMP, VARCHAR
+from sqlalchemy.types import (String, Text, Unicode, UnicodeText, Enum,
+    Integer, BigInteger, SmallInteger, Boolean, Date, DateTime, Float,
+    Numeric, Time, BIGINT, BOOLEAN, CHAR, CLOB, DATE, DATETIME,
+    DECIMAL, FLOAT, INT, INTEGER, NCHAR, NVARCHAR, NUMERIC, REAL,
+    SMALLINT, TEXT, TIME, TIMESTAMP, VARCHAR)
 from sqlalchemy.inspection import inspect
 import datetime
 
 
-__all__ = [b"apply_mql_filters", b"InvalidMQLException",
+__all__ = [b"apply_mql_filters", b"InvalidMqlException",
            b"convert_to_alchemy_type"]
-__version__ = "0.2.0"
+__version__ = "0.3.0"
 
 
-class InvalidMQLException(Exception):
+class InvalidMqlException(Exception):
 
     """Generic exception class for invalid queries."""
 
     pass
 
 
+class MqlTooComplex(InvalidMqlException):
+
+    """Exception class for errors caused by overly complex queries."""
+
+    pass
+
+
+class MqlFieldError(InvalidMqlException):
+
+    """Errors related to a specific field/attr."""
+
+    def __init__(self, data_key, filters, op, message, code, **kwargs):
+        """Initializes a new error.
+
+        :param str data_key: Dot separated field name the error applies
+            to. This should typically be the converted, user facing data
+            key name for ease of feedback.
+        :param str message: Description of the error.
+        :param dict kwargs: Any additional arguments may be stored along
+            with the message as well.
+
+        """
+        self.data_key = data_key
+        self.filter = filters
+        self.message = message
+        self.op = op
+        self.code = code
+        self.kwargs = kwargs
+        super(InvalidMqlException, self).__init__()
+
+
+class MqlFieldPermissionError(InvalidMqlException):
+
+    """Errors for impermissible access to a field."""
+
+    pass
+
+
 def apply_mql_filters(query_session, model_class, filters=None,
-                      whitelist=None, stack_size_limit=None,
-                      convert_key_names_func=None, gettext=None):
+                      whitelist=None, required_filters=None,
+                      stack_size_limit=None, convert_key_names_func=None,
+                      gettext=None):
     """Applies filters to a query and returns it.
 
     Supported operators include:
@@ -60,61 +101,63 @@ def apply_mql_filters(query_session, model_class, filters=None,
     * $eq - Explicit equality check.
     * $like - Search a text field for the given value.
 
-    Considering adding:
-
-    * $regex
-    * $size
-    * Array index queries - e.g. Album.tracks.0 to get the first track.
-
-    Won't be implemented:
-
-    * $all
-    * $exists
-    * $text
-    * $type
-    * $where
-    * Exact matches for arrays/relationships
-
     This function is massive, but breaking it up seemed to make
     things even harder to follow. Should find a better way of
     breaking things up, but for now, accept my apologies.
 
-    Args:
-        query_session: A db session or query object. Filters are applied
-            to this object.
-        model_class: The sqlalchemy model class you want to query.
-        filters: A dictionary of MongoDB style query filters.
-        whitelist: May either be a function, a list, or `None`. If a
-            function is provided, it should take in a dot separated
-            field name and return `True` if it is acceptable to query
-            that field, or `False` if not. If a list of fieldnames is
-            provided, field names will be checked against that list
-            to determine whether or not it is an allowed field to be
-            queried. If `None` is provided, all fields and relationships
-            of a model will be queryable. Also note that the field name
-            being checked will already have been converted by
-            convert_key_names_func if provided.
-        convert_key_names_func: Optional function used to convert
-            a provided attribute name into a field name for a model.
-            Should take one parameter, which is a dot separated
-            name, and should return a converted string in the same
-            dot separated format. For example, say you want to
-            be able to query your model, which contains field names
-            with underscores, using lowerCamelCase instead. The
-            provided function should take a string such as
-            "tracks.unitPrice" and convert it to "tracks.unit_price".
-            For the sake of raising more useful exceptions, the function
-            should return `None` if an invalid field name is provided,
-            however this is not necessary.
-        stack_size_limit: Optional parameter used to limit the allowable
-            complexity of the provided filters. Can be useful in
-            preventing malicious query attempts.
-        gettext: Supply a translation function to convert error messages
-            to the desired language. Note that no translations are
-            included by default, you must generate your own.
+    :param query_session: A db session or query object. Filters are
+        applied to this object.
+    :type query_session: :class:`~sqlalchemy.orm.query.Query` or
+        :class:`~sqlalchemy.orm.session.Session`
+    :param model_class: SQLAlchemy model class you want to query.
+    :param dict filters: Dictionary of MongoDB style query filters.
+    :param whitelist: If a callable is provided, it should take in a
+        dot separated field name and return ``True`` if it is
+        acceptable to query that field, or ``False`` if not. If a
+        list of fieldnames is provided, field names will be checked
+        against that list to determine whether or not it is an
+        allowed field to be queried. If ``None`` is provided, all
+        fields and relationships of a model will be queryable. Also
+        note that the field name being checked will already have
+        been converted by ``convert_key_names_func`` if provided.
+    :type whitelist: callable, list, or None
+    :param required_filters: Can be a function accepting a dot
+        notation attr name (e.g. for an Album ``tracks.playlists``)
+        that returns required SQLAlchemy filters as a single
+        expression (typically using ``and_``) for that model type.
+        Can also be a dict where the keys are dot notation attr name
+        and the values are SQLAlchemy filters. Primarily used to
+        enable enforcing read permissions on different model types
+        depending on context that the provided function may have
+        access to. In the above example, you might have filters
+        like:
+        ``and_(Playlist.id <= 10, Playlist.name.like("Fun%")``.
+        These filters would always be applied, so that the results
+        if a user queries ``{"Tracks.playlist.id": 11}``
+        they wouldn't get any results.
+    :param convert_key_names_func: Optional function used to convert
+        a provided attribute name into a field name for a model.
+        Should take one parameter, which is a dot separated name,
+        and should return a converted string in the same dot
+        separated format. For example, say you want to be able to
+        query your model, which contains field names with
+        underscores, using lowerCamelCase instead. The provided
+        function should take a string such as ``"tracks.unitPrice"``
+        and convert it to ``"tracks.unit_price"``. For the sake of
+        raising more useful exceptions, the function should return
+        ``None`` if an invalid field name is provided, however this
+        is not necessary.
+    :type convert_key_names_func: callable
+    :param stack_size_limit: Optional parameter used to limit the
+        allowable complexity of the provided filters. Can be useful
+        in preventing malicious query attempts.
+    :type stack_size_limit: int or None
+    :param gettext: Supply a translation function to convert error
+        messages to the desired language. Note that no translations
+        are included by default, you must generate your own.
+    :type gettext: callable or None
 
     """
-    # TODO - Improve error messages
     if convert_key_names_func is None:
         def convert_key_names_func(x): return x
     if isinstance(whitelist, list):
@@ -130,6 +173,17 @@ def apply_mql_filters(query_session, model_class, filters=None,
             """All attributes will be queryable."""
             if attr_name:
                 return True
+    if isinstance(required_filters, dict):
+        def build_required_filters(attr_name):
+            """Uses the built in required_filters getter."""
+            return required_filters.get(attr_name)
+    elif callable(required_filters):
+        # Uses the provided required filters function.
+        build_required_filters = required_filters
+    else:
+        def build_required_filters(attr_name):
+            """No filters will be built."""
+            return None
     if gettext is None:
         gettext = dummy_gettext
     _ = gettext
@@ -161,8 +215,8 @@ def apply_mql_filters(query_session, model_class, filters=None,
         c_sub_query_name_stack.append(model_class.__name__)
         while query_stack:
             if stack_size_limit and len(query_stack) > stack_size_limit:
-                raise InvalidMQLException(
-                    "This query is too complex.")
+                raise MqlTooComplex(
+                    _("This query is too complex."))
             item = query_stack.pop()
             if isinstance(item, str):
                 if item == "POP_attr_name_stack":
@@ -176,23 +230,23 @@ def apply_mql_filters(query_session, model_class, filters=None,
                     query_tree = query_tree_stack.pop()
                     if (query_tree["op"] == sqlalchemy.and_ or
                             query_tree["op"] == sqlalchemy.or_):
-                        expression = query_tree["op"](
-                            *query_tree["expressions"])
+                        expressions = [query_tree["op"](
+                            *query_tree["expressions"])]
                     elif query_tree["op"] == sqlalchemy.not_:
-                        expression = sqlalchemy.not_(
-                            query_tree["expressions"][0])
+                        expressions = [sqlalchemy.not_(
+                            query_tree["expressions"][0])]
                     else:
                         # should be a .has or .any.
-                        # expressions should be a one element list
-                        if len(query_tree[
-                                "expressions"]) != 1:    # pragma no cover
-                            # failsafe - Should never reach here.
-                            raise InvalidMQLException(
-                                _("Unexpected error. Too many binary " +
-                                  "expressions for this operator."))
-                        expression = query_tree["op"](
-                            query_tree["expressions"][0])
-                    query_tree_stack[-1]["expressions"].append(expression)
+                        # # expressions should be a one element list
+                        # if len(query_tree[
+                        #         "expressions"]) != 1:    # pragma no cover
+                        #     # failsafe - Should never reach here.
+                        #     raise InvalidMQLException(
+                        #         _("Unexpected error. Too many binary " +
+                        #           "expressions for this operator."))
+                        expressions = [query_tree["op"](
+                            sqlalchemy.and_(*query_tree["expressions"]))]
+                    query_tree_stack[-1]["expressions"].extend(expressions)
             if isinstance(item, dict):
                 if len(item) > 1:
                     query_tree_stack.append({
@@ -203,11 +257,13 @@ def apply_mql_filters(query_session, model_class, filters=None,
                     for key in item:
                         query_stack.append({key: item[key]})
                 elif len(item) == 1:
-                    # Given an attr stack ["Album", "tracks.playlists"]
+                    # Given an attr stack:
+                    # ["Album", "tracks.playlists"]
                     # Current key of "playlist_id"
                     # Convert the key name using the full_attr_name,
-                    # converting it, and chopping off the previous attr
-                    # names that were in the attr stack from the start.
+                    # converting it, and chopping off the previous
+                    # attr names that were in the attr stack from
+                    # the start.
                     key = list(item.keys())[0]
                     if not key.startswith("$"):
                         full_attr_name = _get_full_attr_name(
@@ -247,14 +303,16 @@ def apply_mql_filters(query_session, model_class, filters=None,
                         query_stack.append({"$or": item[key]})
                     elif key == "$elemMatch":
                         attr_name = ".".join(attr_name_stack)
-                        parent_sub_query_names = ".".join(sub_query_name_stack)
+                        parent_sub_query_names = ".".join(
+                            sub_query_name_stack)
                         c_attr_name = ".".join(c_attr_name_stack)
                         c_parent_sub_query_names = ".".join(
                             c_sub_query_name_stack)
                         # trim the parent sub query attrs from
                         # the beginning of the attr_name
-                        # note that parent_sub_query_names will always
-                        # at least contain model_class at the start.
+                        # note that parent_sub_query_names will
+                        # always at least contain model_class at the
+                        # start.
                         c_sub_query_name = c_attr_name[len(
                             c_parent_sub_query_names) + 1:]
                         c_sub_query_name_stack.append(c_sub_query_name)
@@ -264,7 +322,8 @@ def apply_mql_filters(query_session, model_class, filters=None,
                         query_stack.append("POP_sub_query_name_stack")
                         query_stack.append("POP_query_tree_stack")
                         query_stack.append(item[key])
-                        # [1:] to chop model_class from start of name stack
+                        # [1:] to chop model_class from start of
+                        # name stack
                         class_attrs = _get_class_attributes(
                             model_class, ".".join(c_attr_name_stack[1:]))
                         sub_class = class_attrs[-1]
@@ -272,20 +331,40 @@ def apply_mql_filters(query_session, model_class, filters=None,
                         if (hasattr(sub_class, "property") and
                                 isinstance(sub_class.property,
                                            RelationshipProperty)):
+                            # If there are any necessary filters for
+                            # this resource type, make sure they are
+                            # applied. This allows for filter
+                            # scenarios like
+                            # ``filters = {"notifications.id": 5}``
+                            # to safely check only a certain user's
+                            # (as specified in required filters)
+                            # notifications.
+                            expressions = []
+                            required = build_required_filters(
+                                ".".join(attr_name_stack[1:]))
+                            if required is not None:
+                                expressions = [required]
                             if not sub_class.property.uselist:
+                                # TODO -
                                 query_tree_stack.append({
                                     "op": sub_class.has,
-                                    "expressions": []
+                                    "expressions": expressions
                                 })
                             else:
+                                # TODO -
                                 query_tree_stack.append({
                                     "op": sub_class.any,
-                                    "expressions": []
+                                    "expressions": expressions
                                 })
                         else:
-                            raise InvalidMQLException(
-                                _("$elemMatch not applied to subobject: ") +
-                                attr_name)
+                            raise MqlFieldError(
+                                data_key=".".join(attr_name_stack[1:]),
+                                op=key,
+                                filters=item,
+                                code="invalid_elem_match",
+                                message=_(
+                                    "$elemMatch not applied to subobject.")
+                            )
                     elif key.startswith("$"):
                         class_attrs = _get_class_attributes(
                             model_class,
@@ -300,9 +379,16 @@ def apply_mql_filters(query_session, model_class, filters=None,
                         else:
                             # failsafe - should never hit this
                             # due to earlier checks
-                            raise InvalidMQLException(
-                                _("Relation can't be checked for equality: ") +
-                                _get_full_attr_name(attr_name_stack, key))
+                            # TODO - figure out what changed
+                            #  we do hit this now...
+                            raise MqlFieldError(
+                                data_key=".".join(attr_name_stack[1:]),
+                                filters=item,
+                                op=key,
+                                message=_("Relationships can't be "
+                                          "checked for equality."),
+                                code="invalid_relation_comp"
+                            )
                         if key == "$lt":
                             expression = attr < convert_to_alchemy_type(
                                 item[key], target_type)
@@ -322,13 +408,18 @@ def apply_mql_filters(query_session, model_class, filters=None,
                             expression = attr > convert_to_alchemy_type(
                                 item[key], target_type)
                         elif key == "$like":
-                            expression = attr.like("%" + str(item[key]) + "%")
+                            expression = attr.like(
+                                "%" + str(item[key]) + "%")
                         elif key == "$in" or key == "$nin":
                             if not isinstance(item[key], list):
-                                raise InvalidMQLException(
-                                    _("%(attr)s must contain a list: ",
-                                      attr=key) +
-                                    _get_full_attr_name(attr_name_stack))
+                                raise MqlFieldError(
+                                    data_key=".".join(attr_name_stack[1:]),
+                                    op=key,
+                                    filters=item,
+                                    message=_("$in and $nin values must "
+                                              "be a list."),
+                                    code="invalid_in_comp"
+                                )
                             converted_list = []
                             for value in item[key]:
                                 converted_list.append(
@@ -342,32 +433,62 @@ def apply_mql_filters(query_session, model_class, filters=None,
                                     len(item[key]) == 2):
                                 try:
                                     divider = int(item[key][0])
+                                    if int(item[key][0]) != item[key][0]:
+                                        raise ValueError(
+                                            "Decimal provided "
+                                            "instead of int.")
                                     result = int(item[key][1])
+                                    if int(item[key][1]) != item[key][1]:
+                                        raise ValueError(
+                                            "Decimal provided "
+                                            "instead of int.")
                                 except ValueError:
-                                    raise InvalidMQLException(
-                                        _("Non int $mod values supplied: ") +
-                                        _get_full_attr_name(attr_name_stack))
-                                expression = attr.op("%")(divider) == result
+                                    raise MqlFieldError(
+                                        data_key=".".join(
+                                            attr_name_stack[1:]),
+                                        op=key,
+                                        filters=item,
+                                        message=_(
+                                            "Non int $mod value supplied"),
+                                        code="invalid_mod_values"
+                                    )
+                                expression = (
+                                    attr.op("%")(divider) == result)
                             else:
-                                raise InvalidMQLException(
-                                    _("Invalid $mod values supplied: ") +
-                                    _get_full_attr_name(attr_name_stack))
+                                raise MqlFieldError(
+                                    data_key=".".join(attr_name_stack[1:]),
+                                    filters=item,
+                                    op=key,
+                                    message=_("$mod value must be list of "
+                                              "two integers."),
+                                    code="invalid_mod_values"
+                                )
                         else:
-                            raise InvalidMQLException(
-                                _("Invalid operator %(operator)s",
-                                  operator=key) +
-                                _get_full_attr_name(attr_name_stack))
-                        query_tree_stack[-1]["expressions"].append(expression)
+                            raise MqlFieldError(
+                                data_key=".".join(attr_name_stack[1:]),
+                                filters=item,
+                                op=key,
+                                message=_("Invalid operator."),
+                                code="invalid_op"
+                            )
+                        query_tree_stack[-1]["expressions"].append(
+                            expression)
                     elif is_whitelisted(_get_full_attr_name(
                             c_attr_name_stack[1:], c_key)):
-                        if len(attr_name_stack) > len(sub_query_name_stack):
-                            # nested attribute queries aren't allowed.
-                            # this type of search implies an equality
-                            # check on an object.
-                            raise InvalidMQLException(
-                                _("Nested attribute queries are not " +
-                                  "allowed: ") +
-                                _get_full_attr_name(attr_name_stack))
+                        if (len(attr_name_stack) >
+                                len(sub_query_name_stack)):
+                            # nested attr queries aren't allowed.
+                            # this type of search implies an
+                            # equality check on an object.
+                            raise MqlFieldError(
+                                data_key=".".join(attr_name_stack[1:]),
+                                op="$eq",
+                                filters=item,
+                                code="invalid_attr_comp",
+                                message=_(
+                                    "Attempts at comparing an "
+                                    "attribute to an object aren't "
+                                    "valid."))
                         # Next couple blocks of code help us find
                         # the first new relationship property
                         # in our attr hierarchy.
@@ -397,7 +518,8 @@ def apply_mql_filters(query_session, model_class, filters=None,
                         # psq stands for parent_sub_query
                         psq_attr_name = ".".join(c_sub_query_name_stack)
                         psq_class_attrs = _get_class_attributes(
-                            model_class, ".".join(c_sub_query_name_stack[1:]))
+                            model_class, ".".join(
+                                c_sub_query_name_stack[1:]))
                         psq_split_attr_name = psq_attr_name.split('.')
                         psq_relation_indexes = []
                         for i, class_attr in enumerate(psq_class_attrs):
@@ -407,7 +529,8 @@ def apply_mql_filters(query_session, model_class, filters=None,
                                 if (i == len(psq_class_attrs) - 1 or not
                                         psq_split_attr_name[i+1][0].isdigit()):
                                     psq_relation_indexes.append(i)
-                        if len(psq_relation_indexes) == len(relation_indexes):
+                        if (len(psq_relation_indexes) ==
+                                len(relation_indexes)):
                             # There is no new relationship query
                             attr_name_stack.append(key)
                             c_attr_name_stack.append(c_key)
@@ -416,7 +539,8 @@ def apply_mql_filters(query_session, model_class, filters=None,
                                 query_stack.append(item[key])
                             else:
                                 query_stack.append({"$eq": item[key]})
-                        elif len(relation_indexes) > len(psq_relation_indexes):
+                        elif (len(relation_indexes) >
+                                len(psq_relation_indexes)):
                             # Parse out the next relation sub query
                             # e.g.
                             # full_attr_name =
@@ -432,16 +556,17 @@ def apply_mql_filters(query_session, model_class, filters=None,
                             # get the last relation index from the psq
                             prior_relation_index = 0
                             if len(psq_relation_indexes) > 0:
-                                prior_relation_index = psq_relation_indexes[-1]
+                                prior_relation_index = (
+                                    psq_relation_indexes[-1])
                             for i in range(prior_relation_index + 1,
                                            new_relation_index + 1):
                                 attr_name += split_full_attr[i]
                                 c_attr_name += c_split_full_attr[i]
                                 next_relation = new_relation_index
                                 if i != next_relation:    # pragma no cover
-                                    # failsafe - won't hit this until
-                                    # list index based queries are
-                                    # implemented.
+                                    # failsafe - won't hit this
+                                    # until list index based queries
+                                    # are implemented.
                                     attr_name += "."
                                     c_attr_name += "."
                             attr_name_stack.append(attr_name)
@@ -456,30 +581,40 @@ def apply_mql_filters(query_session, model_class, filters=None,
                                 sub_attr_name += split_full_attr[i]
                                 if i != (len(split_full_attr) - 1):
                                     sub_attr_name += "."
-                            # below generated $elemMatches will end up
-                            # appending the attr_name (that was already
-                            # appended to the attr_name_stack) to the
-                            # sub_query_name_stack.
-                            if (new_relation_index == relation_indexes[-1] and
-                                    isinstance(item[key], dict)):
+                            # below generated $elemMatches will end
+                            # up appending the attr_name (that was
+                            # already appended to attr_name_stack)
+                            # to the sub_query_name_stack.
+                            if (new_relation_index == relation_indexes[-1]
+                                    and isinstance(item[key], dict)):
                                 if sub_attr_name != "":
-                                    # querying a single attribute of this
-                                    # relation.
+                                    # querying a single attribute of
+                                    # this relation.
                                     query_stack.append({"$elemMatch": {
                                         sub_attr_name: item[key]}})
                                 else:
                                     if not len(item[key].keys()) > 0:
                                         # dictionary has no keys.
                                         # invalid query.
-                                        raise InvalidMQLException(
-                                            _("Attribute can't be compared " +
-                                              "to an empty dictionary: ") +
-                                            full_attr_name)
+                                        # TODO - what's the op here?
+                                        # None for now, not sure if
+                                        # that's the right exception
+                                        raise MqlFieldError(
+                                            data_key=".".join(
+                                                attr_name_stack[1:]),
+                                            op=None,
+                                            filters=item[key],
+                                            code="invalid_empty_comp",
+                                            message=_(
+                                                "Fields can't be compared "
+                                                "to empty objects.")
+                                        )
                                     else:
-                                        # TODO - may also want to check
-                                        # for invalid sub_keys. A bad
-                                        # key at this point would throw
-                                        # an exception we aren't
+                                        # TODO - may also want to
+                                        # check for invalid
+                                        # sub_keys. A bad key at
+                                        # this point would throw an
+                                        # exception we aren't
                                         # gracefully catching.
                                         query_tree_stack.append({
                                             "op": sqlalchemy.and_,
@@ -495,24 +630,35 @@ def apply_mql_filters(query_session, model_class, filters=None,
                                             else:
                                                 query_stack.append({
                                                     "$elemMatch": {
-                                                        sub_key: item[key]}})
+                                                        sub_key: item[key]}
+                                                })
                             else:
                                 if (new_relation_index ==
                                         relation_indexes[-1] and
                                         sub_attr_name == ""):
-                                    # item[key] is not a dict and there
-                                    # is no sub_attr, so we're trying to
-                                    # equality check a relation.
-                                    raise InvalidMQLException(
-                                        _("Relation can't be checked for " +
-                                          "equality: ") + full_attr_name)
+                                    # item[key] is not a dict and
+                                    # there is no sub_attr, so we're
+                                    # trying to equality check a
+                                    # relation.
+                                    raise MqlFieldError(
+                                        data_key=".".join(
+                                            attr_name_stack[1:]),
+                                        op=None,
+                                        filters=item[key],
+                                        code="invalid_relation_comp",
+                                        message=_(
+                                            "Relationships can't be "
+                                            "compared to primitive "
+                                            "values.")
+                                    )
                                 else:
-                                    # must have a sub_attr, so turn into
-                                    # an elemMatch for that sub_attr.
+                                    # must have a sub_attr, so turn
+                                    # into an elemMatch for that
+                                    # sub_attr.
                                     query_stack.append({"$elemMatch": {
                                         sub_attr_name: item[key]}})
                     else:
-                        raise InvalidMQLException(
+                        raise InvalidMqlException(
                             _("%(attr)s is not a whitelisted attribute.",
                               attr=_get_full_attr_name(attr_name_stack))
                         )

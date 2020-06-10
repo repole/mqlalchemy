@@ -20,7 +20,7 @@ from sqlalchemy.types import \
 import mqlalchemy
 from mqlalchemy.tests import models
 from mqlalchemy import apply_mql_filters, convert_to_alchemy_type, \
-    InvalidMQLException
+    InvalidMqlException
 import datetime
 
 
@@ -155,14 +155,14 @@ class MQLAlchemyTests(unittest.TestCase):
     def test_list_relation_fail(self):
         """Make sure we can't check a relation for equality."""
         self.assertRaises(
-            InvalidMQLException,
+            InvalidMqlException,
             apply_mql_filters,
             self.db_session,
             models.Playlist,
             {"tracks": 7}
         )
         self.assertRaises(
-            InvalidMQLException,
+            InvalidMqlException,
             apply_mql_filters,
             self.db_session,
             models.Playlist,
@@ -344,7 +344,7 @@ class MQLAlchemyTests(unittest.TestCase):
         self.assertTrue(len(result) == 1 and
                         result[0].playlist_id == 18)
         self.assertRaises(
-            InvalidMQLException,
+            InvalidMqlException,
             apply_mql_filters,
             self.db_session,
             models.Playlist,
@@ -353,7 +353,7 @@ class MQLAlchemyTests(unittest.TestCase):
             }}
         )
         self.assertRaises(
-            InvalidMQLException,
+            InvalidMqlException,
             apply_mql_filters,
             self.db_session,
             models.Playlist,
@@ -389,7 +389,7 @@ class MQLAlchemyTests(unittest.TestCase):
             ((result[0].playlist_id == 1 and result[1].playlist_id == 8) or
              (result[0].playlist_id == 8 and result[1].playlist_id == 1)))
         self.assertRaises(
-            InvalidMQLException,
+            InvalidMqlException,
             apply_mql_filters,
             self.db_session,
             models.Playlist,
@@ -412,7 +412,7 @@ class MQLAlchemyTests(unittest.TestCase):
         self.assertTrue(len(result) == 1 and
                         result[0].playlist_id == 1)
         self.assertRaises(
-            InvalidMQLException,
+            InvalidMqlException,
             apply_mql_filters,
             self.db_session,
             models.Playlist,
@@ -437,7 +437,7 @@ class MQLAlchemyTests(unittest.TestCase):
     def test_elemmatch_fail(self):
         """Test that the $elemMatch operator properly fails."""
         self.assertRaises(
-            InvalidMQLException,
+            InvalidMqlException,
             apply_mql_filters,
             self.db_session,
             models.Employee,
@@ -449,7 +449,7 @@ class MQLAlchemyTests(unittest.TestCase):
     def test_nested_attr_query_fail(self):
         """Test that a nested attribute query fails."""
         self.assertRaises(
-            InvalidMQLException,
+            InvalidMqlException,
             apply_mql_filters,
             self.db_session,
             models.Track,
@@ -461,7 +461,7 @@ class MQLAlchemyTests(unittest.TestCase):
     def test_bad_operator_fail(self):
         """Test that a invalid operator fails."""
         self.assertRaises(
-            InvalidMQLException,
+            InvalidMqlException,
             apply_mql_filters,
             self.db_session,
             models.Track,
@@ -474,7 +474,7 @@ class MQLAlchemyTests(unittest.TestCase):
     def test_empty_dict_fail(self):
         """Test that a nested attribute query fails."""
         self.assertRaises(
-            InvalidMQLException,
+            InvalidMqlException,
             apply_mql_filters,
             self.db_session,
             models.Playlist,
@@ -484,7 +484,7 @@ class MQLAlchemyTests(unittest.TestCase):
     def test_whitelist(self):
         """Test that whitelisting works as expected."""
         self.assertRaises(
-            InvalidMQLException,
+            InvalidMqlException,
             apply_mql_filters,
             self.db_session,
             models.Playlist,
@@ -528,7 +528,7 @@ class MQLAlchemyTests(unittest.TestCase):
             ((result[0].playlist_id == 1 and result[1].playlist_id == 8) or
              (result[0].playlist_id == 8 and result[1].playlist_id == 1)))
         self.assertRaises(
-            InvalidMQLException,
+            InvalidMqlException,
             apply_mql_filters,
             self.db_session,
             models.Playlist,
@@ -621,7 +621,7 @@ class MQLAlchemyTests(unittest.TestCase):
         self.assertTrue(len(result) == 1 and
                         result[0].album_id == 1)
         self.assertRaises(
-            InvalidMQLException,
+            InvalidMqlException,
             apply_mql_filters,
             self.db_session,
             models.Album,
@@ -630,6 +630,49 @@ class MQLAlchemyTests(unittest.TestCase):
             [],
             1
         )
+
+    def test_self_referential_relation(self):
+        """Test relationship chain leading to the same model."""
+        query = apply_mql_filters(
+            self.db_session,
+            models.Album,
+            {"tracks.album.album_id": 18}
+        )
+        result = query.all()
+        self.assertTrue(
+            len(result) == 1 and
+            result[0].album_id == 18)
+
+    def test_required_filters(self):
+        """Test required filters are applied properly."""
+        required_filter_log = {}
+
+        def required_filters(key):
+            """Return required filters for a relation based on key name.
+
+            :param str key: Dot separated data key, relative to the
+                root model.
+            :return: Any required filters to be applied to the child
+                relationship.
+
+            """
+            # Do some logging of how many times each key is hit
+            required_filter_log[key] = (required_filter_log.get(key) or 0) + 1
+            if key == "tracks":
+                return models.Track.album.has(models.Album.album_id != 18)
+
+        # Search playlist for a track that is explicitly excluded
+        # via required_filters
+        query = apply_mql_filters(
+            self.db_session,
+            models.Playlist,
+            {"tracks.track_id": 166},
+            required_filters=required_filters
+        )
+        self.assertTrue(required_filter_log.get("tracks") == 1)
+        result = query.all()
+        self.assertTrue(len(result) == 0)
+
 
 if __name__ == '__main__':    # pragma no cover
     unittest.main()
