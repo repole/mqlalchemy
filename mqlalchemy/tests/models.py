@@ -1,14 +1,13 @@
-## -*- coding: utf-8 -*-\
 """
     mqlalchemy.tests.models.py
     ~~~~~~~~~~~~~~~~~~~~~~~~~~
 
     SQLAlchemy models for the Chinook database.
 
-    :copyright: (c) 2016 by Nicholas Repole and contributors.
-                See AUTHORS for more details.
-    :license: MIT - See LICENSE for more details.
 """
+# :copyright: (c) 2020 by Nicholas Repole and contributors.
+#             See AUTHORS for more details.
+# :license: MIT - See LICENSE for more details.
 from sqlalchemy import Column, DateTime, ForeignKey, Integer, Numeric, \
     Table, Unicode
 from sqlalchemy import orm

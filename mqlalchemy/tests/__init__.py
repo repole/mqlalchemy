@@ -5,22 +5,22 @@
 
     Tests for our new query syntax.
 
-    :copyright: (c) 2016 by Nicholas Repole and contributors.
-                See AUTHORS for more details.
-    :license: MIT - See LICENSE for more details.
 """
+# :copyright: (c) 2020 by Nicholas Repole and contributors.
+#             See AUTHORS for more details.
+# :license: MIT - See LICENSE for more details.
 from __future__ import unicode_literals
 import unittest
 import os
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
-from sqlalchemy.types import \
-    String, Integer, Boolean, \
-    Date, DateTime, Float, Time
+from sqlalchemy.types import (
+    String, Integer, Boolean,
+    Date, DateTime, Float, Time)
 import mqlalchemy
 from mqlalchemy.tests import models
-from mqlalchemy import apply_mql_filters, convert_to_alchemy_type, \
-    InvalidMqlException
+from mqlalchemy import (
+    apply_mql_filters, convert_to_alchemy_type, InvalidMqlException)
 import datetime
 
 

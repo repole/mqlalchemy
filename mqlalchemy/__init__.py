@@ -376,14 +376,7 @@ class MqlBuilder(object):
                             expressions = [sqlalchemy.not_(
                                 query_tree["expressions"][0])]
                         else:
-                            # should be a .has or .any.
-                            # # expressions should be a one element list
-                            # if len(query_tree[
-                            #         "expressions"]) != 1:    # pragma no cover
-                            #     # failsafe - Should never reach here.
-                            #     raise InvalidMQLException(
-                            #         _("Unexpected error. Too many binary " +
-                            #           "expressions for this operator."))
+                            # should be a .has or .any
                             expressions = [query_tree["op"](
                                 sqlalchemy.and_(*query_tree["expressions"]))]
                         query_tree_stack[-1]["expressions"].extend(expressions)
@@ -739,9 +732,16 @@ class MqlBuilder(object):
     def convert_to_alchemy_type(cls, value, alchemy_type):
         """Convert a given value to a sqlalchemy friendly type.
 
-        :param value:
-        :param alchemy_type:
-        :return:
+        As a simple example, if given the string ``"5"`` as ``value``,
+        for an ``alchemy_type`` of ``INT``, this will return the int
+        ``5``.
+
+        :param value: User supplied value for a filter.
+        :param alchemy_type: Target SQLAlchemy data type class to
+            convert ``value`` to play nicely with.
+        :raise TypeError:
+        :return: A version of ``value`` that can be used in a SQLAlchemy
+            expression involving an attr of the ``alchemy_type``.
 
         """
         if value is None or str(value).lower() == "null":
@@ -788,17 +788,38 @@ class MqlBuilder(object):
 
 
 def _get_full_attr_name(attr_name_stack, short_attr_name=None):
-    """Join the attr_name_stack to get a full attribute name."""
-    attr_name = ".".join(attr_name_stack)
-    if short_attr_name:
-        if attr_name != "":
-            attr_name += "."
-        attr_name += short_attr_name
-    return attr_name
+    """Join the attr_name_stack to get a full attribute name.
+
+    :param attr_name_stack: List of attribute names sitting on our
+        processing stack while building MQL queries.
+    :param short_attr_name: The trailing attr_name to be appended to the
+        end of our full dot separated attr name.
+    :return: A dot separated data key.
+    :rtype: str
+
+    """
+    return ".".join(
+        attr_name_stack + [short_attr_name] if short_attr_name else [])
 
 
 def _is_whitelisted(model_class, attr_name, whitelist):
-    """Check if this attr_name is approved to be filtered or sorted."""
+    """Check if this attr_name is approved to be filtered or sorted.
+
+    Removes any index references from a dot separated name before
+    checking the whitelist. For example, if ``whitelist`` contains
+    ``["tracks.playlists.track_id"], and the ``attr_name`` is
+    ``"tracks.0.playlists.1.track_id``, this will still evaluate
+    to ``True``.
+
+    :param model_class: A SQLAlchemy model class.
+    :param str attr_name: A dot separated data key.
+    :param list whitelist: List of dot separated attr_names that are ok
+        to be queried.
+    :return: ``True`` if the attr_name is in the whitelist, otherwise
+        ``False``.
+    :rtype: bool
+
+    """
     try:
         _get_class_attributes(model_class, attr_name)
     except AttributeError:
@@ -817,9 +838,18 @@ def _is_whitelisted(model_class, attr_name, whitelist):
 def _get_class_attributes(model_class, attr_name):
     """Get info about each attr given a dot notation attr name.
 
+    If provided with ``Album`` as a ``model_class``, and
+    ``tracks.playlists.playlist_id`` as ``attr_name``, will return a
+    list of 3 items:
+
+    ``[Album.tracks, Track.playlists, Playlist.playlist_id]``
+
+    :param model_class: A SQLAlchemy model class.
+    :param str attr_name: A dot separated data key.
     :raises: AttributeError if an invalid attribute name is given.
     :returns: A list of attributes corresponding to the given
               attr_name for the provided model_class.
+    :rtype: list
 
     """
     split_attr_name = attr_name.split(".")
@@ -850,6 +880,7 @@ def _get_class_attributes(model_class, attr_name):
     return class_attrs
 
 
+# done as a convenience to keep compatibility with older versions
 convert_to_alchemy_type = MqlBuilder.convert_to_alchemy_type
 
 apply_mql_filters = MqlBuilder.apply_mql_filters

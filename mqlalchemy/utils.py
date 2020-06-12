@@ -5,11 +5,10 @@
 
     Utility functions for MQLAlchemy.
 
-    :copyright: (c) 2016 by Nicholas Repole and contributors.
-                See AUTHORS for more details.
-    :license: MIT - See LICENSE for more details.
-
 """
+# :copyright: (c) 2020 by Nicholas Repole and contributors.
+#             See AUTHORS for more details.
+# :license: MIT - See LICENSE for more details.
 
 
 def dummy_gettext(string, **variables):
