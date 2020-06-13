@@ -1,4 +1,3 @@
-## -*- coding: utf-8 -*-\
 """
     mqlalchemy.tests.__init__
     ~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -343,6 +342,9 @@ class MQLAlchemyTests(unittest.TestCase):
         result = query.all()
         self.assertTrue(len(result) == 1 and
                         result[0].playlist_id == 18)
+
+    def test_mod_str_fail(self):
+        """Test passing string values to $mod op fails."""
         self.assertRaises(
             InvalidMqlException,
             apply_mql_filters,
@@ -352,12 +354,51 @@ class MQLAlchemyTests(unittest.TestCase):
                 "$mod": ["test", "hey"]
             }}
         )
+
+    def test_mod_decimal_divisor_fails(self):
+        """Test passing a decimal divisor to $mod op fails."""
         self.assertRaises(
             InvalidMqlException,
             apply_mql_filters,
             self.db_session,
             models.Playlist,
             {"playlist_id": {
+                "$mod": [2.2, 4]
+            }}
+        )
+
+    def test_mod_decimal_remainder_fails(self):
+        """Test passing a decimal remainder to $mod op fails."""
+        self.assertRaises(
+            InvalidMqlException,
+            apply_mql_filters,
+            self.db_session,
+            models.Playlist,
+            {"playlist_id": {
+                "$mod": [2, 4.4]
+            }}
+        )
+
+    def test_mod_non_list(self):
+        """Test passing a non list to $mod op rails."""
+        self.assertRaises(
+            InvalidMqlException,
+            apply_mql_filters,
+            self.db_session,
+            models.Playlist,
+            {"playlist_id": {
+                "$mod": 5
+            }}
+        )
+
+    def test_mod_non_int_field(self):
+        """Test trying to $mod a non int field fails."""
+        self.assertRaises(
+            InvalidMqlException,
+            apply_mql_filters,
+            self.db_session,
+            models.Playlist,
+            {"name": {
                 "$mod": 5
             }}
         )
@@ -613,22 +654,37 @@ class MQLAlchemyTests(unittest.TestCase):
         query = apply_mql_filters(
             self.db_session,
             models.Album,
-            {"album_id": 1,
-             "title": "For Those About To Rock We Salute You"},
+            filters={
+                "album_id": 1,
+                "title": "For Those About To Rock We Salute You"},
             stack_size_limit=10
         )
         result = query.all()
         self.assertTrue(len(result) == 1 and
                         result[0].album_id == 1)
+
+    def test_stack_size_limit_fail(self):
+        """Make sure that limiting the stack size fails as expected."""
         self.assertRaises(
             InvalidMqlException,
             apply_mql_filters,
             self.db_session,
             models.Album,
-            {"album_id": 1,
-             "title": "For Those About To Rock We Salute You"},
-            [],
-            1
+            filters={
+                "album_id": 1,
+                "title": "For Those About To Rock We Salute You"},
+            stack_size_limit=1
+        )
+
+
+    def test_type_conversion_fail(self):
+        """Make sure we can't check a relation for equality."""
+        self.assertRaises(
+            InvalidMqlException,
+            apply_mql_filters,
+            self.db_session,
+            models.Playlist,
+            {"playlist_id": "test"}
         )
 
     def test_self_referential_relation(self):
@@ -670,6 +726,23 @@ class MQLAlchemyTests(unittest.TestCase):
             required_filters=required_filters
         )
         self.assertTrue(required_filter_log.get("tracks") == 1)
+        result = query.all()
+        self.assertTrue(len(result) == 0)
+
+    def test_required_filters_dict(self):
+        """Test dict required filters are applied properly."""
+        required_filters = {
+            "tracks": (
+                models.Track.album.has(models.Album.album_id != 18))}
+
+        # Search playlist for a track that is explicitly excluded
+        # via required_filters
+        query = apply_mql_filters(
+            self.db_session,
+            models.Playlist,
+            {"tracks.track_id": 166},
+            required_filters=required_filters
+        )
         result = query.all()
         self.assertTrue(len(result) == 0)
 
