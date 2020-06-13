@@ -17,7 +17,7 @@ from sqlalchemy.types import (
     String, Integer, Boolean,
     Date, DateTime, Float, Time)
 import mqlalchemy
-from mqlalchemy.tests import models
+from tests import models
 from mqlalchemy import (
     apply_mql_filters, convert_to_alchemy_type, InvalidMqlException)
 import datetime
