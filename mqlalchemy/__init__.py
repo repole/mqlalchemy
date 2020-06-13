@@ -204,7 +204,7 @@ class MqlBuilder(object):
                     message=_("Invalid operator."),
                     code="invalid_op"
                 )
-        except TypeError:
+        except (TypeError, ValueError):
             raise MqlFieldError(
                 data_key=full_data_key,
                 filters=value,
