@@ -10,8 +10,6 @@
 # :copyright: (c) 2020 by Nicholas Repole and contributors.
 #             See AUTHORS for more details.
 # :license: MIT - See LICENSE for more details.
-from __future__ import unicode_literals
-from mqlalchemy._compat import str
 from mqlalchemy.utils import dummy_gettext
 import sqlalchemy
 from sqlalchemy.orm import ColumnProperty, RelationshipProperty

@@ -7,12 +7,16 @@ Release 0.3.0 (WIP)
 
 Incompatible changes
 --------------------
+* Python 2 support removed.
+* Version requirement for SQLAlchemy now >= 1.0.
 * ``InvalidMQLException`` renamed to ``InvalidMqlException``.
 
 Features added
 --------------
 * May now pass in ``required_filters`` to help ease enforcing read permissions.
 * Added more descriptive error classes.
+* Wrapped core functionality in a class to allow for easier overriding.
+* Improved test coverage.
 
 Documentation
 -------------
