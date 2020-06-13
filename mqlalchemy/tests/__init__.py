@@ -39,7 +39,8 @@ class MQLAlchemyTests(unittest.TestCase):
         """Make sure our test db is functional."""
         result = self.db_session.query(models.Album).filter(
             models.Album.album_id == 1).all()
-        self.assertTrue(len(result) == 1 and result[0].artist_id == 1)
+        self.assertTrue(len(result) == 1)
+        self.assertTrue(result[0].artist_id == 1)
 
     def test_simple_query(self):
         """Test a very simple mqlalchemy query."""
@@ -49,9 +50,8 @@ class MQLAlchemyTests(unittest.TestCase):
             {"album_id": 2}
         )
         result = query.all()
-        self.assertTrue(
-            len(result) == 1 and
-            result[0].title == "Balls to the Wall")
+        self.assertTrue(len(result) == 1)
+        self.assertTrue(result[0].title == "Balls to the Wall")
 
     def test_simple_prior_query(self):
         """Test a simple mqlalchemy query using a preformed query."""
@@ -63,9 +63,8 @@ class MQLAlchemyTests(unittest.TestCase):
             {"album_id": 2}
         )
         result = query.all()
-        self.assertTrue(
-            len(result) == 1 and
-            result[0].title == "Balls to the Wall")
+        self.assertTrue(len(result) == 1)
+        self.assertTrue(result[0].title == "Balls to the Wall")
 
     def test_no_match(self):
         """Test that a query that should have no match works."""
@@ -86,10 +85,10 @@ class MQLAlchemyTests(unittest.TestCase):
             {"tracks.track_id": 7}
         )
         result = query.all()
+        self.assertTrue(len(result) == 2)
         self.assertTrue(
-            len(result) == 2 and
-            ((result[0].playlist_id == 1 and result[1].playlist_id == 8) or
-             (result[0].playlist_id == 8 and result[1].playlist_id == 1)))
+            (result[0].playlist_id == 1 and result[1].playlist_id == 8) or
+            (result[0].playlist_id == 8 and result[1].playlist_id == 1))
 
     def test_complex_list_relation(self):
         """Test that a multi-level list relation query works."""
@@ -99,9 +98,8 @@ class MQLAlchemyTests(unittest.TestCase):
             {"tracks.playlists.playlist_id": 18}
         )
         result = query.all()
-        self.assertTrue(
-            len(result) == 1 and
-            result[0].album_id == 48)
+        self.assertTrue(len(result) == 1)
+        self.assertTrue(result[0].album_id == 48)
 
     def test_more_complex_list_relation(self):
         """Test that a complex list relation query works."""
@@ -115,26 +113,22 @@ class MQLAlchemyTests(unittest.TestCase):
             }}
         )
         result = query.all()
-        self.assertTrue(
-            len(result) == 1 and
-            result[0].album_id == 48)
+        self.assertTrue(len(result) == 1)
+        self.assertTrue(result[0].album_id == 48)
 
     def test_complex_convert_name(self):
         """Test that converting from camelCase to underscore works."""
-        def to_lower(txt):
-            return str(txt).lower()
         query = apply_mql_filters(
             self.db_session,
             models.Album,
             {"TRACKS.PLAYLISTS.PLAYLIST_ID": 18},
-            convert_key_names_func=to_lower
+            convert_key_names_func=lambda txt: txt.lower()
         )
         result = query.all()
-        self.assertTrue(
-            len(result) == 1 and
-            result[0].album_id == 48)
+        self.assertTrue(len(result) == 1)
+        self.assertTrue(result[0].album_id == 48)
 
-    def test_explicit_elemmatch(self):
+    def test_explicit_elem_match(self):
         """Test that an explicit elemMatch."""
         query = apply_mql_filters(
             self.db_session,
@@ -146,12 +140,12 @@ class MQLAlchemyTests(unittest.TestCase):
             }}
         )
         result = query.all()
+        self.assertTrue(len(result) == 2)
         self.assertTrue(
-            len(result) == 2 and
-            ((result[0].playlist_id == 1 and result[1].playlist_id == 8) or
-             (result[0].playlist_id == 8 and result[1].playlist_id == 1)))
+            (result[0].playlist_id == 1 and result[1].playlist_id == 8) or
+            (result[0].playlist_id == 8 and result[1].playlist_id == 1))
 
-    def test_list_relation_fail(self):
+    def test_list_relation_eq_fail(self):
         """Make sure we can't check a relation for equality."""
         self.assertRaises(
             InvalidMqlException,
@@ -160,6 +154,9 @@ class MQLAlchemyTests(unittest.TestCase):
             models.Playlist,
             {"tracks": 7}
         )
+
+    def test_list_relation_neq_fail(self):
+        """Make sure we can't check a relation for inequality."""
         self.assertRaises(
             InvalidMqlException,
             apply_mql_filters,
@@ -176,8 +173,8 @@ class MQLAlchemyTests(unittest.TestCase):
             {"artist.artist_id": 275}
         )
         result = query.all()
-        self.assertTrue(
-            len(result) == 1 and result[0].album_id == 347)
+        self.assertTrue(len(result) == 1)
+        self.assertTrue(result[0].album_id == 347)
 
     def test_implicit_and(self):
         """Test that an implicit and query works."""
@@ -188,9 +185,8 @@ class MQLAlchemyTests(unittest.TestCase):
              "playlist_id": 1}
         )
         result = query.all()
-        self.assertTrue(
-            len(result) == 1 and
-            result[0].playlist_id == 1)
+        self.assertTrue(len(result) == 1)
+        self.assertTrue(result[0].playlist_id == 1)
 
     def test_explicit_and(self):
         """Test that the $and operator works."""
@@ -203,9 +199,8 @@ class MQLAlchemyTests(unittest.TestCase):
             ]}
         )
         result = query.all()
-        self.assertTrue(
-            len(result) == 1 and
-            result[0].playlist_id == 1)
+        self.assertTrue(len(result) == 1)
+        self.assertTrue(result[0].playlist_id == 1)
 
     def test_or(self):
         """Test that the $or operator works."""
@@ -218,9 +213,8 @@ class MQLAlchemyTests(unittest.TestCase):
             ]}
         )
         result = query.all()
-        self.assertTrue(
-            len(result) == 1 and
-            result[0].playlist_id == 1)
+        self.assertTrue(len(result) == 1)
+        self.assertTrue(result[0].playlist_id == 1)
 
     def test_negation(self):
         """Test that the $not operator works."""
@@ -233,8 +227,8 @@ class MQLAlchemyTests(unittest.TestCase):
              }}
         )
         result = query.all()
-        self.assertTrue(len(result) == 1 and
-                        result[0].playlist_id == 8)
+        self.assertTrue(len(result) == 1)
+        self.assertTrue(result[0].playlist_id == 8)
 
     def test_nor(self):
         """Test that the $nor operator works."""
@@ -248,8 +242,8 @@ class MQLAlchemyTests(unittest.TestCase):
              ]}
         )
         result = query.all()
-        self.assertTrue(len(result) == 1 and
-                        result[0].playlist_id == 8)
+        self.assertTrue(len(result) == 1)
+        self.assertTrue(result[0].playlist_id == 8)
 
     def test_neq(self):
         """Test that the $ne operator works."""
@@ -262,8 +256,8 @@ class MQLAlchemyTests(unittest.TestCase):
              }}
         )
         result = query.all()
-        self.assertTrue(len(result) == 1 and
-                        result[0].playlist_id == 8)
+        self.assertTrue(len(result) == 1)
+        self.assertTrue(result[0].playlist_id == 8)
 
     def test_lt(self):
         """Test that the $lt operator works."""
@@ -275,8 +269,8 @@ class MQLAlchemyTests(unittest.TestCase):
             }}
         )
         result = query.all()
-        self.assertTrue(len(result) == 1 and
-                        result[0].playlist_id == 1)
+        self.assertTrue(len(result) == 1)
+        self.assertTrue(result[0].playlist_id == 1)
 
     def test_lte(self):
         """Test that the $lte operator works."""
@@ -288,8 +282,8 @@ class MQLAlchemyTests(unittest.TestCase):
             }}
         )
         result = query.all()
-        self.assertTrue(len(result) == 1 and
-                        result[0].playlist_id == 1)
+        self.assertTrue(len(result) == 1)
+        self.assertTrue(result[0].playlist_id == 1)
 
     def test_eq(self):
         """Test that the new $eq operator works."""
@@ -301,8 +295,8 @@ class MQLAlchemyTests(unittest.TestCase):
             }}
         )
         result = query.all()
-        self.assertTrue(len(result) == 1 and
-                        result[0].playlist_id == 1)
+        self.assertTrue(len(result) == 1)
+        self.assertTrue(result[0].playlist_id == 1)
 
     def test_gte(self):
         """Test that the $gte operator works."""
@@ -314,8 +308,8 @@ class MQLAlchemyTests(unittest.TestCase):
             }}
         )
         result = query.all()
-        self.assertTrue(len(result) == 1 and
-                        result[0].playlist_id == 18)
+        self.assertTrue(len(result) == 1)
+        self.assertTrue(result[0].playlist_id == 18)
 
     def test_gt(self):
         """Test that the $gt operator works."""
@@ -327,8 +321,8 @@ class MQLAlchemyTests(unittest.TestCase):
             }}
         )
         result = query.all()
-        self.assertTrue(len(result) == 1 and
-                        result[0].playlist_id == 18)
+        self.assertTrue(len(result) == 1)
+        self.assertTrue(result[0].playlist_id == 18)
 
     def test_mod(self):
         """Test that the $mod operator works."""
@@ -340,8 +334,8 @@ class MQLAlchemyTests(unittest.TestCase):
             }}
         )
         result = query.all()
-        self.assertTrue(len(result) == 1 and
-                        result[0].playlist_id == 18)
+        self.assertTrue(len(result) == 1)
+        self.assertTrue(result[0].playlist_id == 18)
 
     def test_mod_str_fail(self):
         """Test passing string values to $mod op fails."""
@@ -414,9 +408,13 @@ class MQLAlchemyTests(unittest.TestCase):
         )
         result = query.all()
         self.assertTrue(
-            len(result) == 2 and
-            ((result[0].playlist_id == 1 and result[1].playlist_id == 2) or
-             (result[0].playlist_id == 2 and result[1].playlist_id == 1)))
+            len(result) == 2)
+        self.assertTrue(
+            (result[0].playlist_id == 1 and result[1].playlist_id == 2) or
+            (result[0].playlist_id == 2 and result[1].playlist_id == 1))
+
+    def test_in_nested(self):
+        """Test that the $in operator works on nested objects."""
         query = apply_mql_filters(
             self.db_session,
             models.Playlist,
@@ -429,6 +427,9 @@ class MQLAlchemyTests(unittest.TestCase):
             len(result) == 2 and
             ((result[0].playlist_id == 1 and result[1].playlist_id == 8) or
              (result[0].playlist_id == 8 and result[1].playlist_id == 1)))
+
+    def test_in_non_list_fails(self):
+        """Test that the $in op fails when not supplied with a list."""
         self.assertRaises(
             InvalidMqlException,
             apply_mql_filters,
@@ -452,6 +453,9 @@ class MQLAlchemyTests(unittest.TestCase):
         result = query.all()
         self.assertTrue(len(result) == 1 and
                         result[0].playlist_id == 1)
+
+    def test_nin_non_list_fails(self):
+        """Test that the $nin op fails when not supplied with a list."""
         self.assertRaises(
             InvalidMqlException,
             apply_mql_filters,
@@ -472,8 +476,8 @@ class MQLAlchemyTests(unittest.TestCase):
             }}
         )
         result = query.all()
-        self.assertTrue(len(result) == 1 and
-                        result[0].first_name == "Steve")
+        self.assertTrue(len(result) == 1)
+        self.assertTrue(result[0].first_name == "Steve")
 
     def test_elemmatch_fail(self):
         """Test that the $elemMatch operator properly fails."""
@@ -547,9 +551,10 @@ class MQLAlchemyTests(unittest.TestCase):
         )
         result = query.all()
         self.assertTrue(
-            len(result) == 2 and
-            ((result[0].playlist_id == 1 and result[1].playlist_id == 8) or
-             (result[0].playlist_id == 8 and result[1].playlist_id == 1)))
+            len(result) == 2)
+        self.assertTrue(
+            (result[0].playlist_id == 1 and result[1].playlist_id == 8) or
+            (result[0].playlist_id == 8 and result[1].playlist_id == 1))
 
     def test_custom_whitelist_func(self):
         """Test that providing a whitelist function works."""
@@ -565,9 +570,10 @@ class MQLAlchemyTests(unittest.TestCase):
         )
         result = query.all()
         self.assertTrue(
-            len(result) == 2 and
-            ((result[0].playlist_id == 1 and result[1].playlist_id == 8) or
-             (result[0].playlist_id == 8 and result[1].playlist_id == 1)))
+            len(result) == 2)
+        self.assertTrue(
+            (result[0].playlist_id == 1 and result[1].playlist_id == 8) or
+            (result[0].playlist_id == 8 and result[1].playlist_id == 1))
         self.assertRaises(
             InvalidMqlException,
             apply_mql_filters,
@@ -660,8 +666,8 @@ class MQLAlchemyTests(unittest.TestCase):
             stack_size_limit=10
         )
         result = query.all()
-        self.assertTrue(len(result) == 1 and
-                        result[0].album_id == 1)
+        self.assertTrue(len(result) == 1)
+        self.assertTrue(result[0].album_id == 1)
 
     def test_stack_size_limit_fail(self):
         """Make sure that limiting the stack size fails as expected."""
@@ -675,7 +681,6 @@ class MQLAlchemyTests(unittest.TestCase):
                 "title": "For Those About To Rock We Salute You"},
             stack_size_limit=1
         )
-
 
     def test_type_conversion_fail(self):
         """Make sure we can't check a relation for equality."""
@@ -695,9 +700,8 @@ class MQLAlchemyTests(unittest.TestCase):
             {"tracks.album.album_id": 18}
         )
         result = query.all()
-        self.assertTrue(
-            len(result) == 1 and
-            result[0].album_id == 18)
+        self.assertTrue(len(result) == 1)
+        self.assertTrue(result[0].album_id == 18)
 
     def test_required_filters(self):
         """Test required filters are applied properly."""
