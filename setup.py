@@ -16,7 +16,7 @@ setup(
     author='Nicholas Repole',
     author_email='n.repole@gmail.com',
     description='Query SQLAlchemy models with MongoDB syntax.',
-    packages=['mqlalchemy', 'testsxz'],
+    packages=['mqlalchemy', 'tests'],
     zip_safe=False,
     platforms='any',
     test_suite='tests',
