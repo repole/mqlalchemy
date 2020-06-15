@@ -53,7 +53,15 @@ class MqlFieldError(InvalidMqlException):
         :param str data_key: Dot separated field name the error applies
             to. This should typically be the converted, user facing data
             key name for ease of feedback.
+        :param filters: Filters being applied to the ``data_key``. May
+            be a dict or primitive value.
+        :param op: Operation being applied to the ``data_key``. May
+            be ``None`` in cases where an implicit equality check or
+            $elemMatch is being performed.
+        :type op: str or None
         :param str message: Description of the error.
+        :param str code: A standardized descriptive error code, to make
+            external reporting easier.
         :param dict kwargs: Any additional arguments may be stored along
             with the message as well.
 
@@ -67,7 +75,7 @@ class MqlFieldError(InvalidMqlException):
         super(InvalidMqlException, self).__init__()
 
 
-class MqlFieldPermissionError(InvalidMqlException):
+class MqlFieldPermissionError(MqlFieldError):
 
     """Errors for impermissible access to a field."""
 
@@ -476,13 +484,11 @@ class MqlBuilder(object):
                                 if required is not None:
                                     expressions = [required]
                                 if not sub_class.property.uselist:
-                                    # TODO -
                                     query_tree_stack.append({
                                         "op": sub_class.has,
                                         "expressions": expressions
                                     })
                                 else:
-                                    # TODO -
                                     query_tree_stack.append({
                                         "op": sub_class.any,
                                         "expressions": expressions
@@ -654,7 +660,7 @@ class MqlBuilder(object):
                                         if not len(item[key].keys()) > 0:
                                             # dictionary has no keys.
                                             # invalid query.
-                                            # TODO - what's the op here?
+                                            # NOTE - what's the op here?
                                             # None for now, not sure if
                                             # that's the right exception
                                             raise MqlFieldError(
@@ -668,12 +674,12 @@ class MqlBuilder(object):
                                                     "to empty objects.")
                                             )
                                         else:
-                                            # TODO - may also want to
+                                            # NOTE - may also want to
                                             # check for invalid
                                             # sub_keys. A bad key at
                                             # this point would throw an
                                             # exception we aren't
-                                            # gracefully catching.
+                                            # gracefully catching?
                                             query_tree_stack.append({
                                                 "op": sqlalchemy.and_,
                                                 "expressions": []
@@ -687,9 +693,12 @@ class MqlBuilder(object):
                                                             item[key][sub_key]
                                                     })
                                                 else:
+                                                    # implicit elemMatch
+                                                    match = item[key][sub_key]
                                                     query_stack.append({
                                                         "$elemMatch": {
-                                                            sub_key: item[key]}
+                                                            sub_key: match
+                                                        }
                                                     })
                                 else:
                                     if (new_relation_index ==
@@ -717,9 +726,14 @@ class MqlBuilder(object):
                                         query_stack.append({"$elemMatch": {
                                             sub_attr_name: item[key]}})
                         else:
-                            raise InvalidMqlException(
-                                _("%(attr)s is not a whitelisted attribute.",
-                                  attr=_get_full_attr_name(attr_name_stack))
+                            raise MqlFieldPermissionError(
+                                data_key=_get_full_attr_name(
+                                    attr_name_stack[1:], key),
+                                op=None,
+                                filters=item[key],
+                                code="invalid_whitelist_permission",
+                                message=_(
+                                    "Attempt to query a field without access.")
                             )
             if query_tree_stack[-1]["expressions"]:
                 query = query.filter(

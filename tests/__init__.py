@@ -145,6 +145,19 @@ class MQLAlchemyTests(unittest.TestCase):
             (result[0].playlist_id == 1 and result[1].playlist_id == 8) or
             (result[0].playlist_id == 8 and result[1].playlist_id == 1))
 
+    def test_implicit_elem_match(self):
+        """Test that an implicit elemMatch works."""
+        query = apply_mql_filters(
+            self.db_session,
+            models.Playlist,
+            {"tracks": {"track_id": 7}}
+        )
+        result = query.all()
+        self.assertTrue(len(result) == 2)
+        self.assertTrue(
+            (result[0].playlist_id == 1 and result[1].playlist_id == 8) or
+            (result[0].playlist_id == 8 and result[1].playlist_id == 1))
+
     def test_list_relation_eq_fail(self):
         """Make sure we can't check a relation for equality."""
         self.assertRaises(
