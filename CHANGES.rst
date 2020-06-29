@@ -13,7 +13,9 @@ Incompatible changes
 
 Features added
 --------------
-* May now pass in ``required_filters`` to help ease enforcing read permissions.
+* May now pass ``nested_conditions`` to help ease enforcing read permissions.
+* Separate out parsing of filters in case user doesn't want to immediately
+  apply them.
 * Added more descriptive error classes.
 * Wrapped core functionality in a class to allow for easier overriding.
 * Improved test coverage.

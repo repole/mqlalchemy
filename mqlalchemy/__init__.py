@@ -7,7 +7,7 @@
     Mainly useful in providing a querying interface from JavaScript.
 
 """
-# :copyright: (c) 2020 by Nicholas Repole and contributors.
+# :copyright: (c) 2016-2020 by Nicholas Repole and contributors.
 #             See AUTHORS for more details.
 # :license: MIT - See LICENSE for more details.
 from mqlalchemy.utils import dummy_gettext
@@ -223,9 +223,89 @@ class MqlBuilder(object):
 
     @classmethod
     def apply_mql_filters(cls, query_session, model_class, filters=None,
-                          whitelist=None, required_filters=None,
+                          whitelist=None, nested_conditions=None,
                           stack_size_limit=None, convert_key_names_func=None,
                           gettext=None):
+        """Applies filters to a query and returns it.
+
+        Bulk of the work here is done by :meth:`parse_filters`, more
+        detailed documentation can be found there.
+
+        :param query_session: A db session or query object. Filters are
+            applied to this object.
+        :type query_session: :class:`~sqlalchemy.orm.query.Query` or
+            :class:`~sqlalchemy.orm.session.Session`
+        :param model_class: SQLAlchemy model class you want to query.
+        :param dict filters: Dictionary of MongoDB style query filters.
+        :param whitelist: Used to determine whether it's permissible to
+            filter by a given field.
+            The field being checked will be a dot notation attr name
+            (e.g. for Album ``tracks.playlists.playlist_id``) that has
+            already been processed by ``convert_key_names_func`` when
+            applicable.
+            If a callable is provided, it should take in a dot separated
+            field name and return ``True`` if it is acceptable to query
+            that field, or ``False`` if not.
+            If a list of field names is provided, field names will be
+            checked against that list to determine whether or not it
+            is an allowed field to be queried.
+            If ``None`` is provided, all fields and relationships of a
+            model will be queryable.
+        :type whitelist: callable, list, or None
+        :param nested_conditions: Provides SQL expressions, as would be
+            used directly by :meth:`~sqlalchemy.orm.query.Query.filter`,
+            for additional filtering on any nested relationships. Can be
+            a callable accepting a single param, or a dict, where the
+            param/key is the relationship being filtered will be
+            provided as a dot notation name (e.g. for Album
+            ``tracks.playlists``) that has already been processed by
+            ``convert_key_names_func`` when applicable. The value
+            returned can be a single item, list, or tuple.
+        :param nested_conditions: callable, dict, or None
+        :param convert_key_names_func: Optional function used to convert
+            a user provided attribute name into a field name for a model.
+            Should take one parameter, which is a dot separated name,
+            and should return a converted string in the same dot
+            separated format. For example, say you want to be able to
+            query your model, which contains field names with
+            underscores, using lowerCamelCase instead. The provided
+            function should take a string such as ``"tracks.unitPrice"``
+            and convert it to ``"tracks.unit_price"``. For the sake of
+            raising more useful exceptions, the function should return
+            ``None`` if an invalid field name is provided, however this
+            is not necessary.
+        :type convert_key_names_func: callable
+        :param stack_size_limit: Optional parameter used to limit the
+            allowable complexity of the provided filters. Can be useful
+            in preventing malicious query attempts.
+        :type stack_size_limit: int or None
+        :param gettext: Supply a translation function to convert error
+            messages to the desired language. Note that no translations
+            are included by default, you must generate your own.
+        :type gettext: callable or None
+
+        """
+        expressions = cls.parse_mql_filters(
+            model_class=model_class,
+            filters=filters,
+            whitelist=whitelist,
+            nested_conditions=nested_conditions,
+            stack_size_limit=stack_size_limit,
+            convert_key_names_func=convert_key_names_func,
+            gettext=gettext
+        )
+        if hasattr(query_session, "query") and callable(query_session.query):
+            query = query_session.query(model_class)
+        else:
+            query = query_session
+        if expressions:
+            query = query.filter(sqlalchemy.and_(*expressions))
+        return query
+
+    @classmethod
+    def parse_mql_filters(cls, model_class, filters=None, whitelist=None,
+                          nested_conditions=None, stack_size_limit=None,
+                          convert_key_names_func=None, gettext=None):
         """Applies filters to a query and returns it.
 
         Supported operators include:
@@ -248,40 +328,62 @@ class MqlBuilder(object):
         * $eq - Explicit equality check.
         * $like - Search a text field for the given value.
 
-        This function is massive, but breaking it up seemed to make
-        things even harder to follow. Should find a better way of
-        breaking things up, but for now, accept my apologies.
+        Filtering here works similarly to how MongoDB handles querying,
+        with SQLAlchemy relationships being treated like MongoDB treats
+        nested documents.
 
-        :param query_session: A db session or query object. Filters are
-            applied to this object.
-        :type query_session: :class:`~sqlalchemy.orm.query.Query` or
-            :class:`~sqlalchemy.orm.session.Session`
+        The ``whitelist`` and ``nested_conditions`` parameters can be
+        used for fine grain access control, with both serving distinct
+        purposes. ``whitelist`` can be used to apply rules regarding
+        which fields can generally be queried, while
+        ``nested_conditions`` can be used to apply rules regarding
+        what nested records can be accessed in a query.
+
+        As an example, say you want a user to be able to query an album
+        based on the playlists that album's tracks belong to. Your
+        ``whitelist`` would only need ``tracks.playlists.name`` to be
+        included. If the user isn't supposed to have access to playlists
+        with ``"Private"`` in their name, your ``nested_conditions``
+        could look like:
+
+        .. code-block:: python
+
+            def nested_conditions(key):
+                if key == "tracks.playlists":
+                    return not Playlist.name.contains("Private")
+
+        Now if the user provides
+        ``filters={"tracks.playlists.name": { "$like": "Private"}}``,
+        no resulting albums will be returned, even though the user does
+        have access to the ``tracks.playlists.name`` field.
+
         :param model_class: SQLAlchemy model class you want to query.
         :param dict filters: Dictionary of MongoDB style query filters.
-        :param whitelist: If a callable is provided, it should take in a
-            dot separated field name and return ``True`` if it is
-            acceptable to query that field, or ``False`` if not. If a
-            list of fieldnames is provided, field names will be checked
-            against that list to determine whether or not it is an
-            allowed field to be queried. If ``None`` is provided, all
-            fields and relationships of a model will be queryable. Also
-            note that the field name being checked will already have
-            been converted by ``convert_key_names_func`` if provided.
+        :param whitelist: Used to determine whether it's permissible to
+            filter by a given field.
+            The field being checked will be a dot notation attr name
+            (e.g. for Album ``tracks.playlists.playlist_id``) that has
+            already been processed by ``convert_key_names_func`` when
+            applicable.
+            If a callable is provided, it should take in a dot separated
+            field name and return ``True`` if it is acceptable to query
+            that field, or ``False`` if not.
+            If a list of field names is provided, field names will be
+            checked against that list to determine whether or not it
+            is an allowed field to be queried.
+            If ``None`` is provided, all fields and relationships of a
+            model will be queryable.
         :type whitelist: callable, list, or None
-        :param required_filters: Can be a function accepting a dot
-            notation attr name (e.g. for an Album ``tracks.playlists``)
-            that returns required SQLAlchemy filters as a single
-            expression (typically using ``and_``) for that model type.
-            Can also be a dict where the keys are dot notation attr name
-            and the values are SQLAlchemy filters. Primarily used to
-            enable enforcing read permissions on different model types
-            depending on context that the provided function may have
-            access to. In the above example, you might have filters
-            like:
-            ``and_(Playlist.id <= 10, Playlist.name.like("Fun%")``.
-            These filters would always be applied, so that the results
-            if a user queries ``{"Tracks.playlist.id": 11}``
-            they wouldn't get any results.
+        :param nested_conditions: Provides SQL expressions, as would be
+            used directly by :meth:`~sqlalchemy.orm.query.Query.filter`,
+            for additional filtering on any nested relationships. Can be
+            a callable accepting a single param, or a dict, where the
+            param/key is the relationship being filtered will be
+            provided as a dot notation name (e.g. for Album
+            ``tracks.playlists``) that has already been processed by
+            ``convert_key_names_func`` when applicable. The value
+            returned can be a single item, list, or tuple.
+        :param nested_conditions: callable, dict, or None
         :param convert_key_names_func: Optional function used to convert
             a provided attribute name into a field name for a model.
             Should take one parameter, which is a dot separated name,
@@ -320,24 +422,20 @@ class MqlBuilder(object):
                 """All attributes will be queryable."""
                 if data_key:
                     return True
-        if isinstance(required_filters, dict):
-            def build_required_filters(data_key):
-                """Uses the built in required_filters getter."""
-                return required_filters.get(data_key)
-        elif callable(required_filters):
+        if isinstance(nested_conditions, dict):
+            def build_nested_conditions(data_key):
+                """Uses the built in nested_conditions getter."""
+                return nested_conditions.get(data_key)
+        elif callable(nested_conditions):
             # Uses the provided required filters function.
-            build_required_filters = required_filters
+            build_nested_conditions = nested_conditions
         else:
-            def build_required_filters(data_key):
+            def build_nested_conditions(data_key):
                 """No filters will be built."""
                 return None
         if gettext is None:
             gettext = dummy_gettext
         _ = gettext
-        if hasattr(query_session, "query"):
-            query = query_session.query(model_class)
-        else:
-            query = query_session
         if filters is not None:
             # NOTE: Any variable with a c_ prefix is used to store
             # converted key names, in accordance with convert_key_names
@@ -479,10 +577,14 @@ class MqlBuilder(object):
                                 # (as specified in required filters)
                                 # notifications.
                                 expressions = []
-                                required = build_required_filters(
+                                required = build_nested_conditions(
                                     ".".join(attr_name_stack[1:]))
                                 if required is not None:
-                                    expressions = [required]
+                                    if isinstance(required, tuple):
+                                        required = list(required)
+                                    elif not isinstance(required, list):
+                                        required = [required]
+                                    expressions = required
                                 if not sub_class.property.uselist:
                                     query_tree_stack.append({
                                         "op": sub_class.has,
@@ -497,7 +599,7 @@ class MqlBuilder(object):
                                 raise MqlFieldError(
                                     data_key=".".join(attr_name_stack[1:]),
                                     op=key,
-                                    filters=item,
+                                    filters=item[key],
                                     code="invalid_elem_match",
                                     message=_(
                                         "$elemMatch not applied to subobject.")
@@ -520,7 +622,7 @@ class MqlBuilder(object):
                                 #  we do hit this now...
                                 raise MqlFieldError(
                                     data_key=".".join(attr_name_stack[1:]),
-                                    filters=item,
+                                    filters=item[key],
                                     op=key,
                                     message=_("Relationships can't be "
                                               "checked for equality."),
@@ -733,12 +835,12 @@ class MqlBuilder(object):
                                 filters=item[key],
                                 code="invalid_whitelist_permission",
                                 message=_(
-                                    "Attempt to query a field without access.")
+                                    "Attempt made to query a field without "
+                                    "proper permission.")
                             )
             if query_tree_stack[-1]["expressions"]:
-                query = query.filter(
-                    sqlalchemy.and_(*query_tree_stack[-1]["expressions"]))
-        return query
+                return query_tree_stack[-1]["expressions"]
+        return None
 
     @classmethod
     def convert_to_alchemy_type(cls, value, alchemy_type):
