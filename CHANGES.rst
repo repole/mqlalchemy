@@ -2,14 +2,37 @@
 Changes
 =======
 
+Release 0.3.0 (WIP)
+===================
+
+Incompatible changes
+--------------------
+* Python 2 support removed.
+* Version requirement for SQLAlchemy now >= 1.0.
+* ``InvalidMQLException`` renamed to ``InvalidMqlException``.
+
+Features added
+--------------
+* May now pass ``nested_conditions`` to help ease enforcing read permissions.
+* Separate out parsing of filters in case user doesn't want to immediately
+  apply them.
+* Added more descriptive error classes.
+* Wrapped core functionality in a class to allow for easier overriding.
+* Improved test coverage.
+
+Documentation
+-------------
+* Changed docstring format back to standard Sphinx format.
+
+
 Release 0.2.0
 =============
 
 Incompatible changes
 --------------------
-* convert_key_names parameter for apply_mql_filters removed.
-* convert_key_names_func parameter for apply_mql_filters added.
-* All RecordClass parameters names changed to model_class.
+* convert_key_names parameter for ``apply_mql_filters`` removed.
+* convert_key_names_func parameter for ``apply_mql_filters`` added.
+* All ``RecordClass`` parameters names changed to ``model_class``.
 
 Features added
 --------------

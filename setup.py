@@ -16,15 +16,15 @@ setup(
     author='Nicholas Repole',
     author_email='n.repole@gmail.com',
     description='Query SQLAlchemy models with MongoDB syntax.',
-    packages=['mqlalchemy', 'mqlalchemy.tests'],
+    packages=['mqlalchemy', 'tests'],
     zip_safe=False,
     platforms='any',
-    test_suite='mqlalchemy.tests',
+    test_suite='tests',
     tests_require=[
-        'SQLAlchemy>=0.9'
+        'SQLAlchemy>=1.0'
     ],
     install_requires=[
-        'SQLAlchemy>=0.9'
+        'SQLAlchemy>=1.0'
     ],
     keywords=['mongodb', 'sqlalchemy', 'json', 'sql'],
     classifiers=[
@@ -32,11 +32,11 @@ setup(
         "Intended Audience :: Developers",
         "License :: OSI Approved :: MIT License",
         "Programming Language :: Python",
-        "Programming Language :: Python :: 2",
-        "Programming Language :: Python :: 2.7",
         "Programming Language :: Python :: 3",
-        "Programming Language :: Python :: 3.3",
-        "Programming Language :: Python :: 3.4",
+        "Programming Language :: Python :: 3.5",
+        "Programming Language :: Python :: 3.6",
+        "Programming Language :: Python :: 3.7",
+        "Programming Language :: Python :: 3.8",
         "Programming Language :: Python :: Implementation :: CPython",
         "Programming Language :: Python :: Implementation :: PyPy",
         "Topic :: Database :: Front-Ends",

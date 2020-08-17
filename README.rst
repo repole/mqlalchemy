@@ -10,30 +10,30 @@ Why?
 
 The need arose for me to be able to pass complex database filters from
 client side JavaScript to a Python server. I started building some JSON
-style syntax to do so, then realized such a thing already existed. I’ve
+style syntax to do so, then realized such a thing already existed. I've
 never seriously used MongoDB, but the syntax for querying lends itself
 pretty perfectly to this use case.
 
-**That sounds pretty dangerous…**
+**That sounds pretty dangerous...**
 
-It can be. When using this with any sort of user input, you’ll want to
-pass in a whitelist of attributes that are ok to query, otherwise you’ll
-open the possibility of leaked passwords and all sorts of other scary
-stuff.
+It can be. When using this with any sort of user input, you'll want to
+pass in a whitelist of attributes that are ok to query, as well as any
+required filters for each model class, otherwise you'll open the
+possibility of leaked passwords and all sorts of other scary stuff.
 
 **So, can I actually use this for a serious project?**
 
-Maybe? There’s some decent test coverage, but this certainly isn’t a
+Maybe? There's some decent test coverage, but this certainly isn't a
 very mature project yet.
 
-I’ll be pretty active in supporting this, so if you are using this and
+I'll be pretty active in supporting this, so if you are using this and
 run into problems, I should be pretty quick to fix them.
 
 **How fast is it?**
 
-I’m sure my actual syntax parsing is inefficient and has loads of room
+I'm sure my actual syntax parsing is inefficient and has loads of room
 for improvement, but the time it takes to parse should be minimal
-compared to the actual database query, so this shouldn’t slow your
+compared to the actual database query, so this shouldn't slow your
 queries down too much.
 
 Supported Operators
@@ -59,7 +59,7 @@ Custom operators added for convenience:
 
 Not yet supported, but would like to add:
 
--  Index based relation queries. Album.tracks.0.track_id won’t work.
+-  Index based relation queries. Album.tracks.0.track_id won't work.
 -  $regex
 
 Examples
