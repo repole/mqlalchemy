@@ -51,6 +51,7 @@ Supported Operators
 -  $lte
 -  $ne
 -  $mod
+-  $exists
 
 Custom operators added for convenience: 
 

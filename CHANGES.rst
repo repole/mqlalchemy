@@ -2,8 +2,16 @@
 Changes
 =======
 
-Release 0.3.0 (WIP)
-===================
+Release 0.4.0
+=============
+
+Features added
+--------------
+* ``$exists`` now a usable operator.
+
+
+Release 0.3.0
+=============
 
 Incompatible changes
 --------------------

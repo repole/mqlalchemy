@@ -196,6 +196,66 @@ class MQLAlchemyTests(unittest.TestCase):
         self.assertTrue(len(result) == 1)
         self.assertTrue(result[0].album_id == 347)
 
+    def test_attr_exists(self):
+        """Test $exists on a simple attr."""
+        query = apply_mql_filters(
+            self.db_session,
+            Customer,
+            {"company": {"$exists": True}}
+        )
+        results = query.all()
+        self.assertTrue(len(results) == 10)
+
+    def test_attr_not_exists(self):
+        """Test not $exists on a simple attr."""
+        query = apply_mql_filters(
+            self.db_session,
+            Customer,
+            {"company": {"$exists": False}}
+        )
+        results = query.all()
+        self.assertTrue(len(results) == 49)
+
+    def test_child_list_not_exists(self):
+        """Test a child list can be filtered for being missing."""
+        query = apply_mql_filters(
+            self.db_session,
+            Artist,
+            {"albums": {"$exists": False}}
+        )
+        results = query.all()
+        self.assertTrue(len(results) == 71)
+
+    def test_child_list_exists(self):
+        """Test a child list can be checked for existence."""
+        query = apply_mql_filters(
+            self.db_session,
+            Artist,
+            {"albums": {"$exists": True}}
+        )
+        results = query.all()
+        self.assertTrue(len(results) == 204)
+
+    def test_child_non_list_not_exists(self):
+        """Test a non list child can be filtered for being missing."""
+        query = apply_mql_filters(
+            self.db_session,
+            Employee,
+            {"manager": {"$exists": False}}
+        )
+        results = query.all()
+        self.assertTrue(len(results) == 1)
+
+    def test_child_non_list_exists(self):
+        """Test a non list child can be checked for existence."""
+        query = apply_mql_filters(
+            self.db_session,
+            Employee,
+            {"manager": {"$exists": True}}
+        )
+        results = query.all()
+        self.assertTrue(len(results) == 7)
+
     def test_implicit_and(self):
         """Test that an implicit and query works."""
         query = apply_mql_filters(
@@ -740,6 +800,37 @@ class MQLAlchemyTests(unittest.TestCase):
             nested_condition_log[key] = (nested_condition_log.get(key) or 0) + 1
             if key == "tracks":
                 return Track.album.has(Album.album_id != 18)
+
+        # Search playlist for a track that is explicitly excluded
+        # via required_filters
+        query = apply_mql_filters(
+            self.db_session,
+            Playlist,
+            {"tracks.track_id": 166},
+            nested_conditions=nested_conditions
+        )
+        self.assertTrue(nested_condition_log.get("tracks") == 1)
+        result = query.all()
+        self.assertTrue(len(result) == 0)
+
+    def test_required_filters_tuple(self):
+        """Test nested conditions are applied properly as a tuple."""
+        nested_condition_log = {}
+
+        def nested_conditions(key):
+            """Return required filters for a relation based on key name.
+
+            :param str key: Dot separated data key, relative to the
+                root model.
+            :return: Any required filters to be applied to the child
+                relationship.
+            :rtype: tuple
+
+            """
+            # Do some logging of how many times each key is hit
+            nested_condition_log[key] = (nested_condition_log.get(key) or 0) + 1
+            if key == "tracks":
+                return tuple([Track.album.has(Album.album_id != 18)])
 
         # Search playlist for a track that is explicitly excluded
         # via required_filters
