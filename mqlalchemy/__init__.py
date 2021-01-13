@@ -13,6 +13,7 @@
 from mqlalchemy.utils import dummy_gettext
 import sqlalchemy
 from sqlalchemy.orm import ColumnProperty, RelationshipProperty
+from sqlalchemy.orm.interfaces import MANYTOONE
 from sqlalchemy.types import (
     String, Text, Unicode, UnicodeText, Enum, Integer, BigInteger,
     SmallInteger, Boolean, Date, DateTime, Float, Numeric, Time, BIGINT,
@@ -26,7 +27,7 @@ import datetime
 __all__ = [b"MqlBuilder", b"InvalidMqlException", b"MqlTooComplex",
            b"MqlFieldError", b"MqlFieldPermissionError", b"apply_mql_filters",
            b"convert_to_alchemy_type"]
-__version__ = "0.3.0"
+__version__ = "0.4.0"
 
 
 class InvalidMqlException(Exception):
@@ -202,6 +203,15 @@ class MqlBuilder(object):
                                   "two integers."),
                         code="invalid_mod_values"
                     )
+            elif op == "$exists":
+                exists = cls.convert_to_alchemy_type(value, target_type)
+                if isinstance(attr.property, RelationshipProperty):
+                    if attr.property.direction == MANYTOONE:
+                        expression = attr.has() if exists else ~attr.has()
+                    else:
+                        expression = attr.any() if exists else ~attr.any()
+                else:
+                    expression = ~attr.is_(None) if exists else attr.is_(None)
             else:
                 raise MqlFieldError(
                     data_key=full_data_key,
@@ -612,14 +622,16 @@ class MqlBuilder(object):
                                     hasattr(class_attrs[-1], "property") and
                                     isinstance(class_attrs[-1].property,
                                                ColumnProperty)):
-                                target_type = type(
-                                    class_attrs[-1].property.columns[0].type)
+                                attr = class_attrs[-1]
+                                if key == "$exists":
+                                    target_type = Boolean
+                                else:
+                                    target_type = type(
+                                        attr.property.columns[0].type)
+                            elif key == "$exists":
+                                target_type = Boolean
                                 attr = class_attrs[-1]
                             else:
-                                # failsafe - should never hit this
-                                # due to earlier checks
-                                # TODO - figure out what changed
-                                #  we do hit this now...
                                 raise MqlFieldError(
                                     data_key=".".join(attr_name_stack[1:]),
                                     filters=item[key],
@@ -794,6 +806,10 @@ class MqlBuilder(object):
                                                         "$elemMatch":
                                                             item[key][sub_key]
                                                     })
+                                                elif sub_key == "$exists":
+                                                    query_stack.append(
+                                                        item[key]
+                                                    )
                                                 else:
                                                     # implicit elemMatch
                                                     match = item[key][sub_key]
@@ -840,7 +856,6 @@ class MqlBuilder(object):
                             )
             if query_tree_stack[-1]["expressions"]:
                 return query_tree_stack[-1]["expressions"]
-        return None
 
     @classmethod
     def convert_to_alchemy_type(cls, value, alchemy_type):

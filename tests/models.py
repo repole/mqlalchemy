@@ -30,7 +30,7 @@ class Album(Base):
     artist_id = Column(
         "ArtistId", ForeignKey('Artist.ArtistId'), nullable=False, index=True)
 
-    artist = orm.relationship('Artist')
+    artist = orm.relationship('Artist', backref="albums")
 
 
 class Artist(Base):
@@ -90,7 +90,8 @@ class Employee(Base):
     fax = Column("Fax", Unicode(24))
     email = Column("Email", Unicode(60))
 
-    parent = orm.relationship('Employee', remote_side=[employee_id])
+    manager = orm.relationship('Employee', remote_side=[employee_id],
+                               backref="subordinates")
 
 
 class Genre(Base):
