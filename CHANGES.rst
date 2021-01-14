@@ -2,6 +2,14 @@
 Changes
 =======
 
+Release 0.4.1
+=============
+
+Bugs fixed
+----------
+* Fix bug with $exists on MANYTOONE relationships where ``uselist == False``.
+
+
 Release 0.4.0
 =============
 
