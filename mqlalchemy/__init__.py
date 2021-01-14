@@ -13,7 +13,6 @@
 from mqlalchemy.utils import dummy_gettext
 import sqlalchemy
 from sqlalchemy.orm import ColumnProperty, RelationshipProperty
-from sqlalchemy.orm.interfaces import MANYTOONE
 from sqlalchemy.types import (
     String, Text, Unicode, UnicodeText, Enum, Integer, BigInteger,
     SmallInteger, Boolean, Date, DateTime, Float, Numeric, Time, BIGINT,
@@ -206,7 +205,7 @@ class MqlBuilder(object):
             elif op == "$exists":
                 exists = cls.convert_to_alchemy_type(value, target_type)
                 if isinstance(attr.property, RelationshipProperty):
-                    if attr.property.direction == MANYTOONE:
+                    if not attr.property.uselist:
                         expression = attr.has() if exists else ~attr.has()
                     else:
                         expression = attr.any() if exists else ~attr.any()
