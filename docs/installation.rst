@@ -9,4 +9,4 @@ Install the package with pip::
 
 Install from source::
 
-    $ python setup.py install
+    $ pip install .
