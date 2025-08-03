@@ -4,7 +4,7 @@ tests Package
 :mod:`tests` Package
 --------------------
 
-.. automodule:: mqlalchemy.tests
+.. automodule:: tests
     :members:
     :undoc-members:
     :show-inheritance:
@@ -12,8 +12,7 @@ tests Package
 :mod:`models` Module
 --------------------
 
-.. automodule:: mqlalchemy.tests.models
+.. automodule:: tests.models
     :members:
     :undoc-members:
     :show-inheritance:
-

@@ -1,0 +1,71 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "MQLAlchemy"
+dynamic = ["version"]
+description = "Query SQLAlchemy models with MongoDB syntax."
+readme = {file = "README.rst", content-type = "text/x-rst"}
+requires-python = ">=3.8"
+license = {text = "MIT"}
+authors = [
+    {name = "Nick Repole", email = "n.repole@gmail.com"}
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+]
+dependencies = [
+    "sqlalchemy>=2.0",
+]
+
+[project.optional-dependencies]
+test = [
+    "coverage[toml]",
+]
+docs = [
+    "sphinx>=8.1",
+    "sphinx-rtd-theme",
+    "sphinx-autodoc-typehints",
+]
+dev = [
+    # Include both test and docs dependencies
+    "mqlalchemy[test,docs]",
+]
+
+[project.urls]
+"Homepage" = "https://github.com/repole/mqlalchemy"
+"Bug Reports" = "https://github.com/repole/mqlalchemy/issues"
+"Source" = "https://github.com/repole/mqlalchemy"
+"Documentation" = "https://mqlalchemy.readthedocs.io/"
+"Changelog" = "https://github.com/repole/mqlalchemy/blob/master/CHANGELOG.rst"
+
+[tool.setuptools.dynamic]
+version = {attr = "mqlalchemy.__version__"}
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["mqlalchemy*"]
+
+[tool.coverage.run]
+source = ["mqlalchemy"]
+omit = [
+    "tests/*",
+]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise AssertionError",
+    "raise NotImplementedError",
+]
