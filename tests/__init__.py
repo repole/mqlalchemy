@@ -5,13 +5,13 @@
     Tests for our new query syntax.
 
 """
-# :copyright: (c) 2016-2020 by Nicholas Repole and contributors.
+# :copyright: (c) 2016-2025 by Nicholas Repole and contributors.
 #             See AUTHORS for more details.
 # :license: MIT - See LICENSE for more details.
 from __future__ import unicode_literals
 import unittest
 import os
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, select
 from sqlalchemy.orm import sessionmaker, configure_mappers
 from sqlalchemy.types import (
     String, Integer, Boolean,
@@ -44,54 +44,50 @@ class MQLAlchemyTests(unittest.TestCase):
 
     def test_db(self):
         """Make sure our test db is functional."""
-        result = self.db_session.query(Album).filter(
-            Album.album_id == 1).all()
+        stmt = select(Album).where(Album.album_id == 1)
+        result = self.db_session.execute(stmt).scalars().all()
         self.assertTrue(len(result) == 1)
         self.assertTrue(result[0].artist_id == 1)
 
     def test_simple_query(self):
         """Test a very simple mqlalchemy query."""
-        query = apply_mql_filters(
-            self.db_session,
-            Album,
-            {"album_id": 2}
+        stmt = apply_mql_filters(
+            model_class=Album,
+            filters={"album_id": 2}
         )
-        result = query.all()
+        result = self.db_session.execute(stmt).scalars().all()
         self.assertTrue(len(result) == 1)
         self.assertTrue(result[0].title == "Balls to the Wall")
 
     def test_simple_prior_query(self):
         """Test a simple mqlalchemy query using a preformed query."""
-        query = self.db_session.query(Album).filter(
-            Album.artist_id == 2)
-        query = apply_mql_filters(
-            query,
-            Album,
-            {"album_id": 2}
+        stmt = select(Album).where(Album.artist_id == 2)
+        stmt = apply_mql_filters(
+            model_class=Album,
+            query=stmt,
+            filters={"album_id": 2}
         )
-        result = query.all()
+        result = self.db_session.execute(stmt).scalars().all()
         self.assertTrue(len(result) == 1)
         self.assertTrue(result[0].title == "Balls to the Wall")
 
     def test_no_match(self):
         """Test that a query that should have no match works."""
-        query = apply_mql_filters(
-            self.db_session,
-            Playlist,
-            {"tracks.track_id": 7,
-             "playlist_id": 4}
+        stmt = apply_mql_filters(
+            model_class=Playlist,
+            filters={"tracks.track_id": 7,
+                     "playlist_id": 4}
         )
-        result = query.all()
+        result = self.db_session.execute(stmt).scalars().all()
         self.assertTrue(len(result) == 0)
 
     def test_list_relation(self):
         """Test that a list relation .any query works."""
-        query = apply_mql_filters(
-            self.db_session,
-            Playlist,
-            {"tracks.track_id": 7}
+        stmt = apply_mql_filters(
+            model_class=Playlist,
+            filters={"tracks.track_id": 7}
         )
-        result = query.all()
+        result = self.db_session.execute(stmt).scalars().all()
         self.assertTrue(len(result) == 2)
         self.assertTrue(
             (result[0].playlist_id == 1 and result[1].playlist_id == 8) or
@@ -99,54 +95,54 @@ class MQLAlchemyTests(unittest.TestCase):
 
     def test_complex_list_relation(self):
         """Test that a multi-level list relation query works."""
-        query = apply_mql_filters(
-            self.db_session,
-            Album,
-            {"tracks.playlists.playlist_id": 18}
+        stmt = apply_mql_filters(
+            model_class=Album,
+            filters={"tracks.playlists.playlist_id": 18}
         )
-        result = query.all()
+        result = self.db_session.execute(stmt).scalars().all()
         self.assertTrue(len(result) == 1)
         self.assertTrue(result[0].album_id == 48)
 
     def test_more_complex_list_relation(self):
         """Test that a complex list relation query works."""
-        query = apply_mql_filters(
-            self.db_session,
-            Album,
-            {"tracks": {
-                "$elemMatch": {
-                    "playlists.playlist_id": 18
+        stmt = apply_mql_filters(
+            model_class=Album,
+            filters={
+                "tracks": {
+                    "$elemMatch": {
+                        "playlists.playlist_id": 18
+                    }
                 }
-            }}
+            }
         )
-        result = query.all()
+        result = self.db_session.execute(stmt).scalars().all()
         self.assertTrue(len(result) == 1)
         self.assertTrue(result[0].album_id == 48)
 
     def test_complex_convert_name(self):
         """Test that converting from camelCase to underscore works."""
-        query = apply_mql_filters(
-            self.db_session,
-            Album,
-            {"TRACKS.PLAYLISTS.PLAYLIST_ID": 18},
+        stmt = apply_mql_filters(
+            model_class=Album,
+            filters={"TRACKS.PLAYLISTS.PLAYLIST_ID": 18},
             convert_key_names_func=lambda txt: txt.lower()
         )
-        result = query.all()
+        result = self.db_session.execute(stmt).scalars().all()
         self.assertTrue(len(result) == 1)
         self.assertTrue(result[0].album_id == 48)
 
     def test_explicit_elem_match(self):
         """Test that an explicit elemMatch."""
-        query = apply_mql_filters(
-            self.db_session,
-            Playlist,
-            {"tracks": {
-                "$elemMatch": {
-                    "track_id": 7
+        stmt = apply_mql_filters(
+            model_class=Playlist,
+            filters={
+                "tracks": {
+                    "$elemMatch": {
+                        "track_id": 7
+                    }
                 }
-            }}
+            }
         )
-        result = query.all()
+        result = self.db_session.execute(stmt).scalars().all()
         self.assertTrue(len(result) == 2)
         self.assertTrue(
             (result[0].playlist_id == 1 and result[1].playlist_id == 8) or
@@ -154,12 +150,11 @@ class MQLAlchemyTests(unittest.TestCase):
 
     def test_implicit_elem_match(self):
         """Test that an implicit elemMatch works."""
-        query = apply_mql_filters(
-            self.db_session,
-            Playlist,
-            {"tracks": {"track_id": 7}}
+        stmt = apply_mql_filters(
+            model_class=Playlist,
+            filters={"tracks": {"track_id": 7}}
         )
-        result = query.all()
+        result = self.db_session.execute(stmt).scalars().all()
         self.assertTrue(len(result) == 2)
         self.assertTrue(
             (result[0].playlist_id == 1 and result[1].playlist_id == 8) or
@@ -170,9 +165,8 @@ class MQLAlchemyTests(unittest.TestCase):
         self.assertRaises(
             InvalidMqlException,
             apply_mql_filters,
-            self.db_session,
-            Playlist,
-            {"tracks": 7}
+            model_class=Playlist,
+            filters={"tracks": 7}
         )
 
     def test_list_relation_neq_fail(self):
@@ -180,240 +174,244 @@ class MQLAlchemyTests(unittest.TestCase):
         self.assertRaises(
             InvalidMqlException,
             apply_mql_filters,
-            self.db_session,
-            Playlist,
-            {"tracks": {"$ne": 7}}
+            model_class=Playlist,
+            filters={"tracks": {"$ne": 7}}
         )
 
     def test_non_list_relation(self):
         """Test that a non-list relation .has query works."""
-        query = apply_mql_filters(
-            self.db_session,
-            Album,
-            {"artist.artist_id": 275}
+        stmt = apply_mql_filters(
+            model_class=Album,
+            filters={"artist.artist_id": 275}
         )
-        result = query.all()
+        result = self.db_session.execute(stmt).scalars().all()
         self.assertTrue(len(result) == 1)
         self.assertTrue(result[0].album_id == 347)
 
     def test_attr_exists(self):
         """Test $exists on a simple attr."""
-        query = apply_mql_filters(
-            self.db_session,
-            Customer,
-            {"company": {"$exists": True}}
+        stmt = apply_mql_filters(
+            model_class=Customer,
+            filters={"company": {"$exists": True}}
         )
-        results = query.all()
+        results = self.db_session.execute(stmt).scalars().all()
         self.assertTrue(len(results) == 10)
 
     def test_attr_not_exists(self):
         """Test not $exists on a simple attr."""
-        query = apply_mql_filters(
-            self.db_session,
-            Customer,
-            {"company": {"$exists": False}}
+        stmt = apply_mql_filters(
+            model_class=Customer,
+            filters={"company": {"$exists": False}}
         )
-        results = query.all()
+        results = self.db_session.execute(stmt).scalars().all()
         self.assertTrue(len(results) == 49)
 
     def test_child_list_not_exists(self):
         """Test a child list can be filtered for being missing."""
-        query = apply_mql_filters(
-            self.db_session,
-            Artist,
-            {"albums": {"$exists": False}}
+        stmt = apply_mql_filters(
+            model_class=Artist,
+            filters={"albums": {"$exists": False}}
         )
-        results = query.all()
+        results = self.db_session.execute(stmt).scalars().all()
         self.assertTrue(len(results) == 71)
 
     def test_child_list_exists(self):
         """Test a child list can be checked for existence."""
-        query = apply_mql_filters(
-            self.db_session,
-            Artist,
-            {"albums": {"$exists": True}}
+        stmt = apply_mql_filters(
+            model_class=Artist,
+            filters={"albums": {"$exists": True}}
         )
-        results = query.all()
+        results = self.db_session.execute(stmt).scalars().all()
         self.assertTrue(len(results) == 204)
 
     def test_child_non_list_not_exists(self):
         """Test a non list child can be filtered for being missing."""
-        query = apply_mql_filters(
-            self.db_session,
-            Employee,
-            {"manager": {"$exists": False}}
+        stmt = apply_mql_filters(
+            model_class=Employee,
+            filters={"manager": {"$exists": False}}
         )
-        results = query.all()
+        results = self.db_session.execute(stmt).scalars().all()
         self.assertTrue(len(results) == 1)
 
     def test_child_non_list_exists(self):
         """Test a non list child can be checked for existence."""
-        query = apply_mql_filters(
-            self.db_session,
-            Employee,
-            {"manager": {"$exists": True}}
+        stmt = apply_mql_filters(
+            model_class=Employee,
+            filters={"manager": {"$exists": True}}
         )
-        results = query.all()
+        results = self.db_session.execute(stmt).scalars().all()
         self.assertTrue(len(results) == 7)
 
     def test_implicit_and(self):
         """Test that an implicit and query works."""
-        query = apply_mql_filters(
-            self.db_session,
-            Playlist,
-            {"tracks.track_id": 7,
-             "playlist_id": 1}
+        stmt = apply_mql_filters(
+            model_class=Playlist,
+            filters={
+                "tracks.track_id": 7,
+                "playlist_id": 1
+            }
         )
-        result = query.all()
+        result = self.db_session.execute(stmt).scalars().all()
         self.assertTrue(len(result) == 1)
         self.assertTrue(result[0].playlist_id == 1)
 
     def test_explicit_and(self):
         """Test that the $and operator works."""
-        query = apply_mql_filters(
-            self.db_session,
-            Playlist,
-            {"$and": [
-                {"tracks.track_id": 7},
-                {"playlist_id": 1}
-            ]}
+        stmt = apply_mql_filters(
+            model_class=Playlist,
+            filters={
+                "$and": [
+                    {"tracks.track_id": 7},
+                    {"playlist_id": 1}
+                ]
+            }
         )
-        result = query.all()
+        result = self.db_session.execute(stmt).scalars().all()
         self.assertTrue(len(result) == 1)
         self.assertTrue(result[0].playlist_id == 1)
 
     def test_or(self):
         """Test that the $or operator works."""
-        query = apply_mql_filters(
-            self.db_session,
-            Playlist,
-            {"$or": [
-                {"tracks.track_id": 999999},
-                {"playlist_id": 1}
-            ]}
+        stmt = apply_mql_filters(
+            model_class=Playlist,
+            filters={
+                "$or": [
+                    {"tracks.track_id": 999999},
+                    {"playlist_id": 1}
+                ]
+            }
         )
-        result = query.all()
+        result = self.db_session.execute(stmt).scalars().all()
         self.assertTrue(len(result) == 1)
         self.assertTrue(result[0].playlist_id == 1)
 
     def test_negation(self):
         """Test that the $not operator works."""
-        query = apply_mql_filters(
-            self.db_session,
-            Playlist,
-            {"tracks.track_id": 7,
-             "$not": {
-                 "playlist_id": 1
-             }}
+        stmt = apply_mql_filters(
+            model_class=Playlist,
+            filters={
+                "tracks.track_id": 7,
+                "$not": {
+                    "playlist_id": 1
+                }
+            }
         )
-        result = query.all()
+        result = self.db_session.execute(stmt).scalars().all()
         self.assertTrue(len(result) == 1)
         self.assertTrue(result[0].playlist_id == 8)
 
     def test_nor(self):
         """Test that the $nor operator works."""
-        query = apply_mql_filters(
-            self.db_session,
-            Playlist,
-            {"tracks.track_id": 7,
-             "$nor": [
-                 {"playlist_id": 1},
-                 {"playlist_id": 999}
-             ]}
+        stmt = apply_mql_filters(
+            model_class=Playlist,
+            filters={
+                "tracks.track_id": 7,
+                "$nor": [
+                    {"playlist_id": 1},
+                    {"playlist_id": 999}
+                ]
+            }
         )
-        result = query.all()
+        result = self.db_session.execute(stmt).scalars().all()
         self.assertTrue(len(result) == 1)
         self.assertTrue(result[0].playlist_id == 8)
 
     def test_neq(self):
         """Test that the $ne operator works."""
-        query = apply_mql_filters(
-            self.db_session,
-            Playlist,
-            {"tracks.track_id": 7,
-             "playlist_id": {
-                 "$ne": 1
-             }}
+        stmt = apply_mql_filters(
+            model_class=Playlist,
+            filters={
+                "tracks.track_id": 7,
+                "playlist_id": {
+                    "$ne": 1
+                }
+            }
         )
-        result = query.all()
+        result = self.db_session.execute(stmt).scalars().all()
         self.assertTrue(len(result) == 1)
         self.assertTrue(result[0].playlist_id == 8)
 
     def test_lt(self):
         """Test that the $lt operator works."""
-        query = apply_mql_filters(
-            self.db_session,
-            Playlist,
-            {"playlist_id": {
-                "$lt": 2
-            }}
+        stmt = apply_mql_filters(
+            model_class=Playlist,
+            filters={
+                "playlist_id": {
+                    "$lt": 2
+                }
+            }
         )
-        result = query.all()
+        result = self.db_session.execute(stmt).scalars().all()
         self.assertTrue(len(result) == 1)
         self.assertTrue(result[0].playlist_id == 1)
 
     def test_lte(self):
         """Test that the $lte operator works."""
-        query = apply_mql_filters(
-            self.db_session,
-            Playlist,
-            {"playlist_id": {
-                "$lte": 1
-            }}
+        stmt = apply_mql_filters(
+            model_class=Playlist,
+            filters={
+                "playlist_id": {
+                    "$lte": 1
+                }
+            }
         )
-        result = query.all()
+        result = self.db_session.execute(stmt).scalars().all()
         self.assertTrue(len(result) == 1)
         self.assertTrue(result[0].playlist_id == 1)
 
     def test_eq(self):
         """Test that the new $eq operator works."""
-        query = apply_mql_filters(
-            self.db_session,
-            Playlist,
-            {"playlist_id": {
-                "$eq": 1
-            }}
+        stmt = apply_mql_filters(
+            model_class=Playlist,
+            filters={
+                "playlist_id": {
+                    "$eq": 1
+                }
+            }
         )
-        result = query.all()
+        result = self.db_session.execute(stmt).scalars().all()
         self.assertTrue(len(result) == 1)
         self.assertTrue(result[0].playlist_id == 1)
 
     def test_gte(self):
         """Test that the $gte operator works."""
-        query = apply_mql_filters(
-            self.db_session,
-            Playlist,
-            {"playlist_id": {
-                "$gte": 18
-            }}
+        stmt = apply_mql_filters(
+            model_class=Playlist,
+            filters={
+                "playlist_id": {
+                    "$gte": 18
+                }
+            }
         )
-        result = query.all()
+        result = self.db_session.execute(stmt).scalars().all()
         self.assertTrue(len(result) == 1)
         self.assertTrue(result[0].playlist_id == 18)
 
     def test_gt(self):
         """Test that the $gt operator works."""
-        query = apply_mql_filters(
-            self.db_session,
-            Playlist,
-            {"playlist_id": {
-                "$gt": 17
-            }}
+        stmt = apply_mql_filters(
+            model_class=Playlist,
+            filters={
+                "playlist_id": {
+                    "$gt": 17
+                }
+            }
         )
-        result = query.all()
+        result = self.db_session.execute(stmt).scalars().all()
         self.assertTrue(len(result) == 1)
         self.assertTrue(result[0].playlist_id == 18)
 
     def test_mod(self):
         """Test that the $mod operator works."""
-        query = apply_mql_filters(
-            self.db_session,
-            Playlist,
-            {"playlist_id": {
-                "$mod": [18, 0]
-            }}
+        stmt = apply_mql_filters(
+            model_class=Playlist,
+            filters={
+                "playlist_id": {
+                    "$mod": [18, 0]
+                }
+            }
         )
-        result = query.all()
+        result = self.db_session.execute(stmt).scalars().all()
         self.assertTrue(len(result) == 1)
         self.assertTrue(result[0].playlist_id == 18)
 
@@ -422,11 +420,12 @@ class MQLAlchemyTests(unittest.TestCase):
         self.assertRaises(
             InvalidMqlException,
             apply_mql_filters,
-            self.db_session,
-            Playlist,
-            {"playlist_id": {
-                "$mod": ["test", "hey"]
-            }}
+            model_class=Playlist,
+            filters={
+                "playlist_id": {
+                    "$mod": ["test", "hey"]
+                }
+            }
         )
 
     def test_mod_decimal_divisor_fails(self):
@@ -434,11 +433,12 @@ class MQLAlchemyTests(unittest.TestCase):
         self.assertRaises(
             InvalidMqlException,
             apply_mql_filters,
-            self.db_session,
-            Playlist,
-            {"playlist_id": {
-                "$mod": [2.2, 4]
-            }}
+            model_class=Playlist,
+            filters={
+                "playlist_id": {
+                    "$mod": [2.2, 4]
+                }
+            }
         )
 
     def test_mod_decimal_remainder_fails(self):
@@ -446,11 +446,12 @@ class MQLAlchemyTests(unittest.TestCase):
         self.assertRaises(
             InvalidMqlException,
             apply_mql_filters,
-            self.db_session,
-            Playlist,
-            {"playlist_id": {
-                "$mod": [2, 4.4]
-            }}
+            model_class=Playlist,
+            filters={
+                "playlist_id": {
+                    "$mod": [2, 4.4]
+                }
+            }
         )
 
     def test_mod_non_list(self):
@@ -458,11 +459,12 @@ class MQLAlchemyTests(unittest.TestCase):
         self.assertRaises(
             InvalidMqlException,
             apply_mql_filters,
-            self.db_session,
-            Playlist,
-            {"playlist_id": {
-                "$mod": 5
-            }}
+            model_class=Playlist,
+            filters={
+                "playlist_id": {
+                    "$mod": 5
+                }
+            }
         )
 
     def test_mod_non_int_field(self):
@@ -470,23 +472,25 @@ class MQLAlchemyTests(unittest.TestCase):
         self.assertRaises(
             InvalidMqlException,
             apply_mql_filters,
-            self.db_session,
-            Playlist,
-            {"name": {
-                "$mod": 5
-            }}
+            model_class=Playlist,
+            filters={
+                "name": {
+                    "$mod": 5
+                }
+            }
         )
 
     def test_in(self):
         """Test that the $in operator works."""
-        query = apply_mql_filters(
-            self.db_session,
-            Playlist,
-            {"playlist_id": {
-                "$in": [1, 2]
-            }}
+        stmt = apply_mql_filters(
+            model_class=Playlist,
+            filters={
+                "playlist_id": {
+                    "$in": [1, 2]
+                }
+            }
         )
-        result = query.all()
+        result = self.db_session.execute(stmt).scalars().all()
         self.assertTrue(
             len(result) == 2)
         self.assertTrue(
@@ -495,14 +499,15 @@ class MQLAlchemyTests(unittest.TestCase):
 
     def test_in_nested(self):
         """Test that the $in operator works on nested objects."""
-        query = apply_mql_filters(
-            self.db_session,
-            Playlist,
-            {"tracks.track_id": {
-                "$in": [7, 9999]
-            }}
+        stmt = apply_mql_filters(
+            model_class=Playlist,
+            filters={
+                "tracks.track_id": {
+                    "$in": [7, 9999]
+                }
+            }
         )
-        result = query.all()
+        result = self.db_session.execute(stmt).scalars().all()
         self.assertTrue(
             len(result) == 2 and
             ((result[0].playlist_id == 1 and result[1].playlist_id == 8) or
@@ -513,24 +518,28 @@ class MQLAlchemyTests(unittest.TestCase):
         self.assertRaises(
             InvalidMqlException,
             apply_mql_filters,
-            self.db_session,
-            Playlist,
-            {"playlist_id": {
-                "$in": 1
-            }}
+            model_class=Playlist,
+            filters={
+                "playlist_id": {
+                    "$in": 1
+                }
+            }
         )
 
     def test_nin(self):
         """Test that the $nin operator works."""
-        query = apply_mql_filters(
-            self.db_session,
-            Playlist,
-            {"playlist_id": {
-                "$nin": [
-                    2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18]
-            }}
+        stmt = apply_mql_filters(
+            model_class=Playlist,
+            filters={
+                "playlist_id": {
+                    "$nin": [
+                        2, 3, 4, 5, 6, 7, 8, 9, 10, 
+                        11, 12, 13, 14, 15, 16, 17, 18
+                    ]
+                }
+            }
         )
-        result = query.all()
+        result = self.db_session.execute(stmt).scalars().all()
         self.assertTrue(len(result) == 1 and
                         result[0].playlist_id == 1)
 
@@ -539,23 +548,25 @@ class MQLAlchemyTests(unittest.TestCase):
         self.assertRaises(
             InvalidMqlException,
             apply_mql_filters,
-            self.db_session,
-            Playlist,
-            {"playlist_id": {
-                "$nin": 1
-            }}
+            model_class=Playlist,
+            filters={
+                "playlist_id": {
+                    "$nin": 1
+                }
+            }
         )
 
     def test_like(self):
         """Test that the new $like operator works."""
-        query = apply_mql_filters(
-            self.db_session,
-            Employee,
-            {"first_name": {
-                "$like": "tev"
-            }}
+        stmt = apply_mql_filters(
+            model_class=Employee,
+            filters={
+                "first_name": {
+                    "$like": "tev"
+                }
+            }
         )
-        result = query.all()
+        result = self.db_session.execute(stmt).scalars().all()
         self.assertTrue(len(result) == 1)
         self.assertTrue(result[0].first_name == "Steve")
 
@@ -564,11 +575,12 @@ class MQLAlchemyTests(unittest.TestCase):
         self.assertRaises(
             InvalidMqlException,
             apply_mql_filters,
-            self.db_session,
-            Employee,
-            {"first_name": {
-                "$elemMatch": {"test": "test"}
-            }}
+            model_class=Employee,
+            filters={
+                "first_name": {
+                    "$elemMatch": {"test": "test"}
+                }
+            }
         )
 
     def test_nested_attr_query_fail(self):
@@ -576,11 +588,12 @@ class MQLAlchemyTests(unittest.TestCase):
         self.assertRaises(
             InvalidMqlException,
             apply_mql_filters,
-            self.db_session,
-            Track,
-            {"track_id": {
-                "info": 5
-            }}
+            model_class=Track,
+            filters={
+                "track_id": {
+                    "info": 5
+                }
+            }
         )
 
     def test_bad_operator_fail(self):
@@ -588,12 +601,13 @@ class MQLAlchemyTests(unittest.TestCase):
         self.assertRaises(
             InvalidMqlException,
             apply_mql_filters,
-            self.db_session,
-            Track,
-            {"track_id": {
-                "$bad": 5
-            }},
-            ["track_id"]
+            model_class=Track,
+            filters={
+                "track_id": {
+                    "$bad": 5
+                }
+            },
+            whitelist=["track_id"]
         )
 
     def test_empty_dict_fail(self):
@@ -601,9 +615,8 @@ class MQLAlchemyTests(unittest.TestCase):
         self.assertRaises(
             InvalidMqlException,
             apply_mql_filters,
-            self.db_session,
-            Playlist,
-            {"tracks": {}}
+            model_class=Playlist,
+            filters={"tracks": {}}
         )
 
     def test_whitelist(self):
@@ -611,10 +624,9 @@ class MQLAlchemyTests(unittest.TestCase):
         self.assertRaises(
             InvalidMqlException,
             apply_mql_filters,
-            self.db_session,
-            Playlist,
-            {"tracks.track_id": 7},
-            []
+            model_class=Playlist,
+            filters={"tracks.track_id": 7},
+            whitelist=[]
         )
         self.assertFalse(
             mqlalchemy._is_whitelisted(
@@ -623,13 +635,12 @@ class MQLAlchemyTests(unittest.TestCase):
                 ["bad_attr_name"]
             )
         )
-        query = apply_mql_filters(
-            self.db_session,
-            Playlist,
-            {"tracks.track_id": 7},
-            ["tracks.track_id"]
+        stmt = apply_mql_filters(
+            model_class=Playlist,
+            filters={"tracks.track_id": 7},
+            whitelist=["tracks.track_id"]
         )
-        result = query.all()
+        result = self.db_session.execute(stmt).scalars().all()
         self.assertTrue(
             len(result) == 2)
         self.assertTrue(
@@ -642,13 +653,12 @@ class MQLAlchemyTests(unittest.TestCase):
             if attr_name == "tracks.track_id":
                 return True
             return False
-        query = apply_mql_filters(
-            self.db_session,
-            Playlist,
-            {"tracks.track_id": 7},
-            whitelist
+        stmt = apply_mql_filters(
+            model_class=Playlist,
+            filters={"tracks.track_id": 7},
+            whitelist=whitelist
         )
-        result = query.all()
+        result = self.db_session.execute(stmt).scalars().all()
         self.assertTrue(
             len(result) == 2)
         self.assertTrue(
@@ -657,10 +667,9 @@ class MQLAlchemyTests(unittest.TestCase):
         self.assertRaises(
             InvalidMqlException,
             apply_mql_filters,
-            self.db_session,
-            Playlist,
-            {"tracks.name": "Test"},
-            whitelist
+            model_class=Playlist,
+            filters={"tracks.name": "Test"},
+            whitelist=whitelist
         )
 
     def test_convert_to_int(self):
@@ -737,15 +746,14 @@ class MQLAlchemyTests(unittest.TestCase):
 
     def test_stack_size_limit(self):
         """Make sure that limiting the stack size works as expected."""
-        query = apply_mql_filters(
-            self.db_session,
-            Album,
+        stmt = apply_mql_filters(
+            model_class=Album,
             filters={
                 "album_id": 1,
                 "title": "For Those About To Rock We Salute You"},
             stack_size_limit=10
         )
-        result = query.all()
+        result = self.db_session.execute(stmt).scalars().all()
         self.assertTrue(len(result) == 1)
         self.assertTrue(result[0].album_id == 1)
 
@@ -754,8 +762,7 @@ class MQLAlchemyTests(unittest.TestCase):
         self.assertRaises(
             InvalidMqlException,
             apply_mql_filters,
-            self.db_session,
-            Album,
+            model_class=Album,
             filters={
                 "album_id": 1,
                 "title": "For Those About To Rock We Salute You"},
@@ -767,19 +774,17 @@ class MQLAlchemyTests(unittest.TestCase):
         self.assertRaises(
             InvalidMqlException,
             apply_mql_filters,
-            self.db_session,
-            Playlist,
-            {"playlist_id": "test"}
+            model_class=Playlist,
+            filters={"playlist_id": "test"}
         )
 
     def test_self_referential_relation(self):
         """Test relationship chain leading to the same model."""
-        query = apply_mql_filters(
-            self.db_session,
-            Album,
-            {"tracks.album.album_id": 18}
+        stmt = apply_mql_filters(
+            model_class=Album,
+            filters={"tracks.album.album_id": 18}
         )
-        result = query.all()
+        result = self.db_session.execute(stmt).scalars().all()
         self.assertTrue(len(result) == 1)
         self.assertTrue(result[0].album_id == 18)
 
@@ -803,14 +808,13 @@ class MQLAlchemyTests(unittest.TestCase):
 
         # Search playlist for a track that is explicitly excluded
         # via required_filters
-        query = apply_mql_filters(
-            self.db_session,
-            Playlist,
-            {"tracks.track_id": 166},
+        stmt = apply_mql_filters(
+            model_class=Playlist,
+            filters={"tracks.track_id": 166},
             nested_conditions=nested_conditions
         )
         self.assertTrue(nested_condition_log.get("tracks") == 1)
-        result = query.all()
+        result = self.db_session.execute(stmt).scalars().all()
         self.assertTrue(len(result) == 0)
 
     def test_required_filters_tuple(self):
@@ -834,14 +838,13 @@ class MQLAlchemyTests(unittest.TestCase):
 
         # Search playlist for a track that is explicitly excluded
         # via required_filters
-        query = apply_mql_filters(
-            self.db_session,
-            Playlist,
-            {"tracks.track_id": 166},
+        stmt = apply_mql_filters(
+            model_class=Playlist,
+            filters={"tracks.track_id": 166},
             nested_conditions=nested_conditions
         )
         self.assertTrue(nested_condition_log.get("tracks") == 1)
-        result = query.all()
+        result = self.db_session.execute(stmt).scalars().all()
         self.assertTrue(len(result) == 0)
 
     def test_nested_conditions_dict(self):
@@ -852,13 +855,12 @@ class MQLAlchemyTests(unittest.TestCase):
 
         # Search playlist for a track that is explicitly excluded
         # via required_filters
-        query = apply_mql_filters(
-            self.db_session,
-            Playlist,
-            {"tracks.track_id": 166},
+        stmt = apply_mql_filters(
+            model_class=Playlist,
+            filters={"tracks.track_id": 166},
             nested_conditions=nested_conditions
         )
-        result = query.all()
+        result = self.db_session.execute(stmt).scalars().all()
         self.assertTrue(len(result) == 0)
 
 

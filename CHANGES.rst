@@ -2,6 +2,16 @@
 Changes
 =======
 
+Release 1.0.0
+=============
+
+Incompatible changes
+--------------------
+* Version requirement for SQLAlchemy now >= 2.0.
+* `apply_mql_filters` method signature changed to accept `select` 
+  constructs from SQLAlchemy rather than sessions or queries.
+
+
 Release 0.4.1
 =============
 

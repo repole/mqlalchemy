@@ -21,20 +21,10 @@ pass in a whitelist of attributes that are ok to query, as well as any
 required filters for each model class, otherwise you'll open the
 possibility of leaked passwords and all sorts of other scary stuff.
 
-**So, can I actually use this for a serious project?**
-
-Maybe? There's some decent test coverage, but this certainly isn't a
-very mature project yet.
-
-I'll be pretty active in supporting this, so if you are using this and
-run into problems, I should be pretty quick to fix them.
-
 **How fast is it?**
 
-I'm sure my actual syntax parsing is inefficient and has loads of room
-for improvement, but the time it takes to parse should be minimal
-compared to the actual database query, so this shouldn't slow your
-queries down too much.
+The time it takes to parse should be minimal compared to the actual 
+database query, so this shouldn't slow your queries down noticably.
 
 Supported Operators
 -------------------
@@ -88,8 +78,13 @@ Examples
             {"artist.name": "Led Zeppelin"}
         ]
     }
-    query = apply_mql_filters(db_session, Album, filters, whitelist)
-    matching_records = query.all()
+    query = select(Album)
+    query = apply_mql_filters(
+        model_class=Album,
+        query=select(Album),
+        filters=filters, 
+        whitelist=whitelist)
+    matching_records = db_session.execute(query).scalars().all()
 
 For more, please see the included tests, as they're probably the
 easiest way to get an idea of how the library can be used.
@@ -100,15 +95,16 @@ Contributing
 Submit a pull request and make sure to include an updated AUTHORS 
 with your name along with an updated CHANGES.rst.
 
-License
+License 
 -------
 
 MIT
 
-.. |Build Status| image:: https://travis-ci.org/repole/mqlalchemy.svg?branch=master
-   :target: https://travis-ci.org/repole/mqlalchemy
-.. |Coverage Status| image:: https://coveralls.io/repos/repole/mqlalchemy/badge.svg?branch=master
-   :target: https://coveralls.io/r/repole/mqlalchemy?branch=master
 .. |Docs| image:: https://readthedocs.org/projects/mqlalchemy/badge/?version=latest
    :target: http://mqlalchemy.readthedocs.org/en/latest/
 
+.. |Build Status| image:: https://github.com/repole/mqlalchemy/actions/workflows/ci-cd.yml/badge.svg
+   :target: https://github.com/repole/mqlalchemy/actions/workflows/ci-cd.yml
+
+.. |Coverage Status| image:: https://codecov.io/gh/repole/mqlalchemy/graph/badge.svg?token=38Y51DIIM3 
+   :target: https://codecov.io/gh/repole/mqlalchemy

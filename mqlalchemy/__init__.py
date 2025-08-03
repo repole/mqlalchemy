@@ -7,11 +7,12 @@
     Mainly useful in providing a querying interface from JavaScript.
 
 """
-# :copyright: (c) 2016-2020 by Nicholas Repole and contributors.
+# :copyright: (c) 2016-2025 by Nicholas Repole and contributors.
 #             See AUTHORS for more details.
 # :license: MIT - See LICENSE for more details.
 from mqlalchemy.utils import dummy_gettext
 import sqlalchemy
+from sqlalchemy import select
 from sqlalchemy.orm import ColumnProperty, RelationshipProperty
 from sqlalchemy.types import (
     String, Text, Unicode, UnicodeText, Enum, Integer, BigInteger,
@@ -23,9 +24,9 @@ from sqlalchemy.inspection import inspect
 import datetime
 
 
-__all__ = [b"MqlBuilder", b"InvalidMqlException", b"MqlTooComplex",
-           b"MqlFieldError", b"MqlFieldPermissionError", b"apply_mql_filters",
-           b"convert_to_alchemy_type"]
+__all__ = ["MqlBuilder", "InvalidMqlException", "MqlTooComplex",
+           "MqlFieldError", "MqlFieldPermissionError", "apply_mql_filters",
+           "convert_to_alchemy_type"]
 __version__ = "0.4.1"
 
 
@@ -231,20 +232,22 @@ class MqlBuilder(object):
         return expression
 
     @classmethod
-    def apply_mql_filters(cls, query_session, model_class, filters=None,
+    def apply_mql_filters(cls, model_class, query=None, filters=None, 
                           whitelist=None, nested_conditions=None,
                           stack_size_limit=None, convert_key_names_func=None,
                           gettext=None):
-        """Applies filters to a query and returns it.
+        """Applies filters to a select statement and returns it.
 
         Bulk of the work here is done by :meth:`parse_filters`, more
         detailed documentation can be found there.
 
-        :param query_session: A db session or query object. Filters are
-            applied to this object.
-        :type query_session: :class:`~sqlalchemy.orm.query.Query` or
-            :class:`~sqlalchemy.orm.session.Session`
         :param model_class: SQLAlchemy model class you want to query.
+        :type model_class: :class:`~sqlalchemy.orm.DeclarativeMeta` or
+            :class:`~sqlalchemy.orm.util.AliasedClass`
+        :param query: A select statement that directly references
+            the provided `model_class`. Optional, useful if there
+            are already some set of filters previously applied.
+        :type query: :class:`~sqlalchemy.sql.selectable.Select`
         :param dict filters: Dictionary of MongoDB style query filters.
         :param whitelist: Used to determine whether it's permissible to
             filter by a given field.
@@ -292,6 +295,9 @@ class MqlBuilder(object):
             messages to the desired language. Note that no translations
             are included by default, you must generate your own.
         :type gettext: callable or None
+        :return: A filtered SQLAlchemy select object of the provided
+            `model_class`.
+        :rtype: sqlalchemy.sql.selectable.Select
 
         """
         expressions = cls.parse_mql_filters(
@@ -303,12 +309,10 @@ class MqlBuilder(object):
             convert_key_names_func=convert_key_names_func,
             gettext=gettext
         )
-        if hasattr(query_session, "query") and callable(query_session.query):
-            query = query_session.query(model_class)
-        else:
-            query = query_session
+        if query is None:
+            query = select(model_class)
         if expressions:
-            query = query.filter(sqlalchemy.and_(*expressions))
+            query = query.where(sqlalchemy.and_(*expressions))
         return query
 
     @classmethod
@@ -481,6 +485,8 @@ class MqlBuilder(object):
                         relation_type_stack.pop()
                     elif item == "POP_query_tree_stack":
                         query_tree = query_tree_stack.pop()
+                        query_tree["expressions"] = (
+                            query_tree["expressions"] or [True])
                         if (query_tree["op"] == sqlalchemy.and_ or
                                 query_tree["op"] == sqlalchemy.or_):
                             expressions = [query_tree["op"](
