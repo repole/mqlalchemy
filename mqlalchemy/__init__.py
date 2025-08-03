@@ -485,6 +485,8 @@ class MqlBuilder(object):
                         relation_type_stack.pop()
                     elif item == "POP_query_tree_stack":
                         query_tree = query_tree_stack.pop()
+                        query_tree["expressions"] = (
+                            query_tree["expressions"] or [True])
                         if (query_tree["op"] == sqlalchemy.and_ or
                                 query_tree["op"] == sqlalchemy.or_):
                             expressions = [query_tree["op"](
