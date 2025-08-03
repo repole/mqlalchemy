@@ -95,10 +95,16 @@ Contributing
 Submit a pull request and make sure to include an updated AUTHORS 
 with your name along with an updated CHANGES.rst.
 
-License
+License 
 -------
 
 MIT
 
 .. |Docs| image:: https://readthedocs.org/projects/mqlalchemy/badge/?version=latest
    :target: http://mqlalchemy.readthedocs.org/en/latest/
+
+.. |Build Status| image:: https://github.com/repole/mqlalchemy/actions/workflows/ci-cd.yml/badge.svg
+   :target: https://github.com/repole/mqlalchemy/actions/workflows/ci-cd.yml
+
+.. |Coverage Status| image:: https://codecov.io/gh/repole/mqlalchemy/graph/badge.svg?token=38Y51DIIM3 
+   :target: https://codecov.io/gh/repole/mqlalchemy
