@@ -746,7 +746,7 @@ class MqlBuilder(object):
                                     attr_name += split_full_attr[i]
                                     c_attr_name += c_split_full_attr[i]
                                     next_relation = new_relation_index
-                                    if i != next_relation:    # pragma no cover
+                                    if i != next_relation:  # pragma: no cover
                                         # failsafe - won't hit this
                                         # until list index based queries
                                         # are implemented.
