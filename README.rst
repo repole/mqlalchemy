@@ -1,7 +1,7 @@
 MQLAlchemy
 ==========
 
-|Build Status| |Coverage Status| |Docs|
+|Build Status| |Docs|
 
 Query SQLAlchemy models using MongoDB style syntax.
 
@@ -105,6 +105,3 @@ MIT
 
 .. |Build Status| image:: https://github.com/repole/mqlalchemy/actions/workflows/ci-cd.yml/badge.svg
    :target: https://github.com/repole/mqlalchemy/actions/workflows/ci-cd.yml
-
-.. |Coverage Status| image:: https://codecov.io/gh/repole/mqlalchemy/graph/badge.svg?token=38Y51DIIM3 
-   :target: https://codecov.io/gh/repole/mqlalchemy
