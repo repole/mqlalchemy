@@ -1,7 +1,7 @@
 MQLAlchemy
 ==========
 
-|Build Status| |Docs|
+|Build Status| |Coverage| |Docs|
 
 Query SQLAlchemy models using MongoDB style syntax.
 
@@ -100,8 +100,11 @@ License
 
 MIT
 
-.. |Docs| image:: https://readthedocs.org/projects/mqlalchemy/badge/?version=latest
-   :target: http://mqlalchemy.readthedocs.org/en/latest/
-
 .. |Build Status| image:: https://github.com/repole/mqlalchemy/actions/workflows/ci-cd.yml/badge.svg
    :target: https://github.com/repole/mqlalchemy/actions/workflows/ci-cd.yml
+
+.. |Coverage| image:: https://coveralls.io/repos/github/repole/mqlalchemy/badge.svg?branch=master
+   :target: https://coveralls.io/github/repole/mqlalchemy?branch=master
+
+.. |Docs| image:: https://readthedocs.org/projects/mqlalchemy/badge/?version=latest
+   :target: http://mqlalchemy.readthedocs.org/en/latest/
