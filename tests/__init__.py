@@ -42,6 +42,11 @@ class MQLAlchemyTests(unittest.TestCase):
         self.DBSession = sessionmaker(bind=self.db_engine)
         self.db_session = self.DBSession()
 
+    def tearDown(self):
+        """Clean up database connections."""
+        self.db_session.close()
+        self.db_engine.dispose()
+
     def test_db(self):
         """Make sure our test db is functional."""
         stmt = select(Album).where(Album.album_id == 1)
