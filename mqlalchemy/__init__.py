@@ -27,7 +27,7 @@ import datetime
 __all__ = ["MqlBuilder", "InvalidMqlException", "MqlTooComplex",
            "MqlFieldError", "MqlFieldPermissionError", "apply_mql_filters",
            "convert_to_alchemy_type"]
-__version__ = "0.4.1"
+__version__ = "1.0.0"
 
 
 class InvalidMqlException(Exception):
