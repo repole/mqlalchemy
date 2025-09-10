@@ -868,6 +868,21 @@ class MQLAlchemyTests(unittest.TestCase):
         result = self.db_session.execute(stmt).scalars().all()
         self.assertTrue(len(result) == 0)
 
+    def test_hybrid_prop(self):
+        """Test that the $gte operator works."""
+        stmt = apply_mql_filters(
+            model_class=Employee,
+            filters={
+                "time_at_company": {
+                    "$gte": 10
+                }
+            }
+        )
+        result = self.db_session.execute(stmt).scalars().all()
+        self.assertTrue(len(result) == 8)
+        for employee in result:
+            self.assertTrue(employee.time_at_company >= 10)
+
 
 if __name__ == '__main__':    # pragma no cover
     unittest.main()

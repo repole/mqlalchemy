@@ -5,15 +5,16 @@
     SQLAlchemy models for the Chinook database.
 
 """
-# :copyright: (c) 2020 by Nicholas Repole and contributors.
+# :copyright: (c) 2025 by Nicholas Repole and contributors.
 #             See AUTHORS for more details.
 # :license: MIT - See LICENSE for more details.
 from sqlalchemy import Column, DateTime, ForeignKey, Integer, Numeric, \
     Table, Unicode
-from sqlalchemy import orm
+from sqlalchemy import case, func, orm, Integer
 from sqlalchemy.sql.sqltypes import NullType
 from sqlalchemy.ext.declarative import declarative_base
-
+from sqlalchemy.ext.hybrid import hybrid_property
+from datetime import date
 
 Base = declarative_base()
 metadata = Base.metadata
@@ -93,6 +94,28 @@ class Employee(Base):
     manager = orm.relationship('Employee', remote_side=[employee_id],
                                backref="subordinates")
 
+    @hybrid_property
+    def time_at_company(self):
+        """Calculate the time at company via Python."""
+        today = date.today()
+        if self.hire_date is None:
+            return None
+        return today.year - self.hire_date.year - (
+            (today.month, today.day) < (
+                self.hire_date.month, self.hire_date.day))
+
+    @time_at_company.expression
+    def time_at_company(cls):
+        """Calculate time at company via SQL."""
+        today = func.date('now')
+        return (
+            func.strftime('%Y', today).cast(Integer) - 
+            func.strftime('%Y', cls.hire_date).cast(Integer) - 
+            case((
+                func.strftime('%m-%d', today) < 
+                func.strftime('%m-%d', cls.hire_date), 1
+            ), else_=0)
+        )
 
 class Genre(Base):
 

@@ -623,19 +623,31 @@ class MqlBuilder(object):
                             class_attrs = _get_class_attributes(
                                 model_class,
                                 ".".join(c_attr_name_stack[1:]))
-                            if (class_attrs and
-                                    hasattr(class_attrs[-1], "property") and
-                                    isinstance(class_attrs[-1].property,
-                                               ColumnProperty)):
+                            has_expression = class_attrs and hasattr(
+                                class_attrs[-1], "expression")
+                            has_prop = class_attrs and hasattr(
+                                class_attrs[-1], "property")
+                            prop_is_relation = has_prop and isinstance(
+                                class_attrs[-1].property,
+                                RelationshipProperty)
+                            prop_is_column = has_prop and isinstance(
+                                class_attrs[-1].property, 
+                                ColumnProperty) 
+                            if key=="$exists" and (has_expression or has_prop):
                                 attr = class_attrs[-1]
-                                if key == "$exists":
-                                    target_type = Boolean
-                                else:
-                                    target_type = type(
-                                        attr.property.columns[0].type)
-                            elif key == "$exists":
                                 target_type = Boolean
+                            elif prop_is_column:
                                 attr = class_attrs[-1]
+                                target_type = type(
+                                    attr.property.columns[0].type)
+                            elif has_expression and (
+                                    class_attrs[-1].expression.type and
+                                    not prop_is_relation):
+                                attr = class_attrs[-1]
+                                target_type = type(attr.expression.type)
+                            elif key == "$exists":
+                                attr = class_attrs[-1]
+                                target_type = Boolean
                             else:
                                 raise MqlFieldError(
                                     data_key=".".join(attr_name_stack[1:]),
